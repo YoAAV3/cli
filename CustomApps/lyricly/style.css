@@ -1,0 +1,209 @@
+/* Lyricly on AMLL — host chrome only. The lyric view itself (blur,
+   spring motion, word fill, dots) and the drifting background are drawn
+   by @applemusic-like-lyrics/core (styles injected from its bundle).
+   This file: layout, header, static fallback, debug. */
+.lyricly-root {
+	position: relative;
+	height: 100%;
+	overflow: hidden;
+	background: #000;
+	color: #fff;
+	font-family: inherit;
+	display: flex;
+	flex-direction: column;
+}
+.lyricly-head {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	z-index: 3;
+	display: none;
+	align-items: center;
+	gap: 12px;
+	padding: 14px 20px;
+	/* The header floats over the lyric scene without its own coloured panel. */
+	background: transparent !important;
+}
+.lyricly-titles { min-width: 0; margin-right: auto; }
+.lyricly-title {
+	font-size: 15px;
+	font-weight: 700;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.lyricly-artist {
+	font-size: 13px;
+	opacity: 0.65;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.lyricly-src { opacity: 0.55; font-size: 12px; }
+/* Older deployed app bundles may still render this control; keep it out of
+   the view until those bundles are refreshed. */
+.lyricly-settings { display: none !important; }
+/* Stage: AMLL background canvas + lyric element mount here, stacked. */
+.lyricly-stage {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+}
+.lyricly-player {
+	position: absolute;
+	inset: 0;
+	z-index: 20 !important;
+}
+.lyricly-player canvas {
+	position: absolute;
+	inset: 0;
+}
+/* Lyric layer above canvas + tint. Brightness lift so text reads
+   bright white even under the noir veil (single static filter). */
+.lyricly-player .amll-lyric-player {
+	position: relative;
+	z-index: 30 !important;
+	/* Do not blend the white glyphs back into AMLL's animated canvas. */
+	mix-blend-mode: normal !important;
+	/* Do not lift every lyric: contrast belongs exclusively to the active word. */
+	filter: none;
+}
+/* Noir veil over the AMLL canvas: black-to-wine gradient that pulls any
+   cover palette into brand range. Static layer, no animation, sits under
+   the lyric text. */
+.lyricly-tint {
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+	pointer-events: none;
+	background:
+		radial-gradient(120% 90% at 80% 10%, rgba(122, 14, 30, 0.35), transparent 60%),
+		linear-gradient(180deg, rgba(5, 3, 3, 0.55), rgba(5, 3, 3, 0.75));
+	/* Never dim the lyric renderer. The background renderer already provides
+	   the scene; removing this veil fixes the apparent dark overlay. */
+	display: none !important;
+}
+/* Interlude dots in accent red (pinned to core@0.6.0 class names). */
+.lyricly-player .amll-lyric-player .FmKaba_interludeDots > * {
+	background-color: #E0112B;
+}
+/* Bolder lyric type: outranks the bundled AMLL rules by specificity
+   (hashed names below are pinned to core@0.6.0 — re-check on upgrade). */
+.lyricly-player .amll-lyric-player .FmKaba_lyricLine,
+.lyricly-player .amll-lyric-player .FmKaba_lyricMainLine {
+	font-weight: 800;
+}
+/* AMLL's word mask reads these variables for the current line. The sung
+   word is hard white; upcoming words remain clearly readable rather than
+   disappearing into the background. */
+.lyricly-player .amll-lyric-player .FmKaba_lyricMainLine.FmKaba_active {
+	--bright-mask-alpha: 1 !important;
+	--dark-mask-alpha: 0.34 !important;
+	color: #fff !important;
+	font-weight: 900 !important;
+	filter: brightness(3.8) contrast(1.8) !important;
+}
+/* AMLL applies a dim inline opacity to the active line wrapper. Remove only
+   that wrapper fade; the per-word mask above still decides what is bright. */
+.lyricly-player .amll-lyric-player .FmKaba_lyricLineWrapper:has(.FmKaba_lyricMainLine.FmKaba_active) {
+	opacity: 1 !important;
+}
+.lyricly-player .amll-lyric-player .FmKaba_lyricMainLine.FmKaba_active .FmKaba_emphasizeWrapper > span {
+	color: #fff !important;
+	font-weight: 900 !important;
+	-webkit-text-stroke: 0 transparent !important;
+	filter: brightness(4) contrast(1.8) !important;
+	/* No animated neon trail: brightness comes from the white glyph itself. */
+	text-shadow: none !important;
+	/* AMLL animates mask-position inline.  Pin the mask's two actual alpha
+	   stops here, so the passed segment is absolute white regardless of
+	   its internal variable/transition state.  Position keeps animating,
+	   therefore this stays word-progressive rather than whitening a line. */
+	mask-image: linear-gradient(to right, rgb(0 0 0 / 1) 47%, rgb(0 0 0 / 0.22) 53%) !important;
+	-webkit-mask-image: linear-gradient(to right, rgb(0 0 0 / 1) 47%, rgb(0 0 0 / 0.22) 53%) !important;
+}
+/* A word at AMLL mask-position 0px is completely sung. The extension tags
+   it so it bypasses the alpha mask altogether: it is actual #fff, not a
+   white color seen through a translucent overlay. */
+.lyricly-player .amll-lyric-player .FmKaba_lyricMainLine.FmKaba_active .FmKaba_emphasizeWrapper > span.lyricly-word-complete {
+	position: relative !important;
+	z-index: 2147483647 !important;
+	isolation: isolate;
+	mix-blend-mode: screen !important;
+	opacity: 1 !important;
+	mask-image: none !important;
+	-webkit-mask-image: none !important;
+	filter: brightness(1.35) contrast(1.15) !important;
+	color: #fff !important;
+	text-shadow: none !important;
+}
+/* Spotify's route shortcut creates a second Lyricly button in the global
+   top bar. The native lyrics button in the player bar is the sole entry. */
+.main-globalNav-navLink[aria-label="Lyricly"] {
+	display: none !important;
+}
+/* Fullscreen is intentionally the same focused, album-art-driven lyric
+   scene: no Spotify chrome, larger type, and extra contrast like Apple
+   Music's lyrics presentation. */
+.lyricly-root:fullscreen,
+.lyricly-root.lyricly-fullscreen,
+html:fullscreen .lyricly-root {
+	background: #000;
+}
+.lyricly-root:fullscreen .lyricly-player .amll-lyric-player,
+.lyricly-root.lyricly-fullscreen .lyricly-player .amll-lyric-player,
+html:fullscreen .lyricly-root .lyricly-player .amll-lyric-player {
+	filter: brightness(1.5) contrast(1.12);
+}
+.lyricly-root:fullscreen .lyricly-player .FmKaba_lyricMainLine.FmKaba_active,
+.lyricly-root.lyricly-fullscreen .lyricly-player .FmKaba_lyricMainLine.FmKaba_active,
+html:fullscreen .lyricly-root .lyricly-player .FmKaba_lyricMainLine.FmKaba_active {
+	--dark-mask-alpha: 0.34 !important;
+}
+/* Static fallback (unsynced/instrumental): plain readable block. */
+.lyricly-static {
+	position: absolute;
+	inset: 0;
+	overflow-y: auto;
+	padding: 6vh 8vw 20vh;
+	font-size: clamp(20px, 3vw, 32px);
+	font-weight: 700;
+	line-height: 1.6;
+	text-align: center;
+	opacity: 0.9;
+	z-index: 2;
+}
+.lyricly-empty {
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	text-align: center;
+	padding-top: 16vh;
+	font-size: 22px;
+	opacity: 0.9;
+}
+.lyricly-none-art {
+	font-size: 64px;
+	opacity: 0.35;
+	margin-bottom: 12px;
+}
+.lyricly-hint { font-size: 14px; opacity: 0.6; margin-top: 10px; }
+.lyricly-debug {
+	position: absolute;
+	left: 16px;
+	bottom: 16px;
+	z-index: 10;
+	background: rgba(0, 0, 0, 0.82);
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	border-radius: 10px;
+	padding: 10px 14px;
+	font-size: 13px;
+	line-height: 1.6;
+	font-family: monospace;
+	pointer-events: none;
+	max-width: 70%;
+}
+@media (prefers-reduced-motion: reduce) {
+	.lyricly-player canvas { animation: none; }
+}
