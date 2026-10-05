@@ -58,6 +58,8 @@
 .lyricly-player canvas {
 	position: absolute;
 	inset: 0;
+	width: 100%;
+	height: 100%;
 }
 /* Lyric layer above canvas + tint. Brightness lift so text reads
    bright white even under the noir veil (single static filter). */

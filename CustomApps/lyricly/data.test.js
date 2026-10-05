@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 
 import { toAMLLLines } from "./amll-map.js";
-import { fetchLRCLIB, interpolatePlaybackPosition, parseLyricsFile, parseSyncedLyrics, resolveLyrics, shapeLines } from "./data.js";
+import {
+  fetchLRCLIB, interpolatePlaybackPosition, lyricDisplayPosition,
+  normalizeAlbumArtSource, parseLyricsFile, parseSyncedLyrics, resolveLyrics, shapeLines,
+} from "./data.js";
 
 const originalFetch = globalThis.fetch;
 const originalSpicetify = globalThis.Spicetify;
@@ -95,6 +98,22 @@ test("interpolates lyric playback between Spotify progress samples and clamps to
   assert.equal(interpolatePlaybackPosition(52000, 10000, 10500, true, 239000), 52500);
   assert.equal(interpolatePlaybackPosition(52000, 10000, 10500, false, 239000), 52000);
   assert.equal(interpolatePlaybackPosition(238900, 10000, 10500, true, 239000), 239000);
+});
+
+test("previews the first lyric while paused before its timestamp without changing active playback time", () => {
+  assert.equal(lyricDisplayPosition(2970, false, 3960), 3960);
+  assert.equal(lyricDisplayPosition(5000, false, 3960), 5000);
+  assert.equal(lyricDisplayPosition(2970, true, 3960), 2970);
+  assert.equal(lyricDisplayPosition(2970, false, null), 2970);
+});
+
+test("converts Spotify image URIs to loadable artwork URLs", () => {
+  assert.equal(
+    normalizeAlbumArtSource("spotify:image:ab67616d0000b27325c28f3c9fbdbab1a88dd619"),
+    "https://i.scdn.co/image/ab67616d0000b27325c28f3c9fbdbab1a88dd619",
+  );
+  assert.equal(normalizeAlbumArtSource("https://i.scdn.co/image/example"), "https://i.scdn.co/image/example");
+  assert.equal(normalizeAlbumArtSource("spotify:track:example"), "");
 });
 
 test("uses LRCLIB word timings before contacting Spotify", async () => {

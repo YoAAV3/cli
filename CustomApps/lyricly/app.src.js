@@ -10,12 +10,14 @@ import coreCss from "@applemusic-like-lyrics/core/style.css";
 import {
 	cacheGet, cacheSet,
 	trackInfo, resolveLyrics, interpolatePlaybackPosition,
+	lyricDisplayPosition,
 } from "./data.js";
 import { toAMLLLines } from "./amll-map.js";
 
 const React = Spicetify.React;
 const PLAYER_SAMPLE_MS = 200;
 const LYRIC_FRAME_INTERVAL_MS = 1000 / 30;
+const PAUSED_FRAME_INTERVAL_MS = 100;
 const SEEK_THRESHOLD_MS = 750;
 const BACKGROUND_RENDER_SCALE = 0.8;
 const BACKGROUND_RENDER_MAX_DPR = 1.25;
@@ -69,9 +71,15 @@ function LyriclyApp() {
 		let pos = 0;
 		try { pos = Spicetify.Player.getProgress() || 0; } catch (e) {}
 		pos = Math.max(0, Math.round(pos));
+		let isPlaying = false;
+		try { isPlaying = !!Spicetify.Player.isPlaying(); } catch (e) {}
+		am.firstLyricStart = amLines.length
+			? amLines.reduce((first, line) => Math.min(first, line.startTime), Infinity)
+			: null;
+		const displayPos = lyricDisplayPosition(pos, isPlaying, am.firstLyricStart);
 		try {
-			am.player.setLyricLines(amLines, pos);
-			am.player.setCurrentTime(pos, true);
+			am.player.setLyricLines(amLines, displayPos);
+			am.player.setCurrentTime(displayPos, true);
 			am.player.update(0);
 		} catch (e) {
 			console.error("[lyricly] renderer rejected the current lyrics.", { trackId, error: e });
@@ -212,7 +220,8 @@ function LyriclyApp() {
 				return;
 			}
 			am.raf = requestAnimationFrame(frame);
-			if (am.lastUpdate >= 0 && now - am.lastUpdate < LYRIC_FRAME_INTERVAL_MS) return;
+			const frameInterval = am.isPlaying ? LYRIC_FRAME_INTERVAL_MS : PAUSED_FRAME_INTERVAL_MS;
+			if (am.lastUpdate >= 0 && now - am.lastUpdate < frameInterval) return;
 			try {
 				const dt = am.lastUpdate < 0 ? 0 : Math.min(now - am.lastUpdate, 100);
 				am.lastUpdate = now;
@@ -244,9 +253,10 @@ function LyriclyApp() {
 					am.lastPlayerSample = now;
 				}
 				const position = interpolatePlaybackPosition(am.anchorProgress, am.anchorAt, now, am.isPlaying, am.anchorDuration);
-				if (Math.abs(position - am.lastPushed) >= 8) {
-					try { player.setCurrentTime(Math.round(position)); } catch (e) {}
-					am.lastPushed = position;
+				const displayPosition = lyricDisplayPosition(position, am.isPlaying, am.firstLyricStart);
+				if (Math.abs(displayPosition - am.lastPushed) >= 8) {
+					try { player.setCurrentTime(Math.round(displayPosition)); } catch (e) {}
+					am.lastPushed = displayPosition;
 				}
 				try { player.update(dt); } catch (e) {}
 			} catch (e) {}
@@ -268,8 +278,6 @@ function LyriclyApp() {
 				if (!am.raf) am.raf = requestAnimationFrame(frame);
 				return;
 			}
-			if (am.raf) cancelAnimationFrame(am.raf);
-			am.raf = 0;
 			if (!playing) {
 				let raw = 0;
 				try { raw = Number(Spicetify.Player.getProgress()) || 0; } catch (e) {}
@@ -280,12 +288,19 @@ function LyriclyApp() {
 				am.anchorDuration = duration;
 				am.anchorAt = now;
 				am.lastPlayerSample = now;
-				try { player.setCurrentTime(Math.round(am.anchorProgress)); } catch (e) {}
+				const displayPos = lyricDisplayPosition(am.anchorProgress, false, am.firstLyricStart);
+				try { player.setCurrentTime(Math.round(displayPos)); } catch (e) {}
 				try { player.update(0); } catch (e) {}
-				am.lastPushed = am.anchorProgress;
+				am.lastPushed = displayPos;
 			}
 			try { player.pause(); } catch (e) {}
 			try { background.pause(); } catch (e) {}
+			if (document.hidden) {
+				if (am.raf) cancelAnimationFrame(am.raf);
+				am.raf = 0;
+			} else if (!am.raf) {
+				am.raf = requestAnimationFrame(frame);
+			}
 		};
 		const onVisibilityChange = () => {
 			const am = amRef.current;

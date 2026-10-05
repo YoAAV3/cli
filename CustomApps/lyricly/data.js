@@ -59,6 +59,19 @@ function interpolatePlaybackPosition(anchorProgress, anchorAt, now, isPlaying, d
 	return durationMs > 0 ? Math.min(position, durationMs) : position;
 }
 
+function lyricDisplayPosition(position, isPlaying, firstLineStart) {
+	const current = Math.max(0, Number(position) || 0);
+	const firstStart = Number(firstLineStart);
+	return !isPlaying && Number.isFinite(firstStart) && current < firstStart ? firstStart : current;
+}
+
+function normalizeAlbumArtSource(source) {
+	const value = String(source || "").trim();
+	const spotifyImage = value.match(/^spotify:image:([a-zA-Z0-9]+)$/);
+	if (spotifyImage) return `https://i.scdn.co/image/${spotifyImage[1]}`;
+	return /^https?:\/\//i.test(value) ? value : "";
+}
+
 async function fetchSpotifyLyrics(info) {
 	// Fallback: color-lyrics straight from Spotify, by track ID, through
 	// Spicetify.CosmosAsync (the client's own authenticated channel —
@@ -285,7 +298,7 @@ function trackInfo() {
 			durationSec: Math.round(durationMs / 1000),
 			uri: item.uri || "",
 			trackId: trackIdFromUri(item.uri || ""),
-			art: meta.image_xlarge_url || meta.image_large_url || meta.image_url || "",
+			art: normalizeAlbumArtSource(meta.image_xlarge_url || meta.image_large_url || meta.image_url || ""),
 		};
 	} catch (e) {
 		return { title: "", artist: "", album: "", durationMs: 0, durationSec: 0, uri: "", trackId: "", art: "" };
@@ -562,7 +575,8 @@ async function resolveLyrics(info) {
 
 export {
 	CACHE_LIMIT, cacheGet, cacheSet, sessionStats, logSyncType,
-	countSyllables, interpolatePlaybackPosition, fetchSpotifyLyrics, shapeLines,
+	countSyllables, interpolatePlaybackPosition, lyricDisplayPosition,
+	normalizeAlbumArtSource, fetchSpotifyLyrics, shapeLines,
 	looksBg, splitWordsTimed, markBgLines, trackInfo, trackIdFromUri,
 	parseSyncedLyrics, parseLyricsFile, fetchLRCLIB, resolveLyrics,
 };
