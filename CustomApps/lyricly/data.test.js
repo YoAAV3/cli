@@ -80,6 +80,17 @@ test("line-synced lyrics end at the next provider timestamp without extending pa
   assert.equal(second.endMs, 5000);
 });
 
+test("uses provider line ends and gives simultaneous lines the same next boundary", () => {
+  const [first, second, final] = shapeLines([
+    { startMs: 1000, endMs: 1600, text: "First simultaneous line" },
+    { startMs: 1000, text: "Second simultaneous line" },
+    { startMs: 2000, text: "Final line" },
+  ], 5000);
+  assert.equal(first.endMs, 1600);
+  assert.equal(second.endMs, 2000);
+  assert.equal(final.endMs, 5000);
+});
+
 test("interpolates lyric playback between Spotify progress samples and clamps to duration", () => {
   assert.equal(interpolatePlaybackPosition(52000, 10000, 10500, true, 239000), 52500);
   assert.equal(interpolatePlaybackPosition(52000, 10000, 10500, false, 239000), 52000);
@@ -224,7 +235,7 @@ test("falls back to Spotify when LRCLIB has no valid word timing", async () => {
         return {
           lyrics: {
             syncType: "LINE_SYNCED",
-            lines: [{ startTimeMs: "1000", words: "Hello world" }],
+            lines: [{ startTimeMs: "1000", endTimeMs: "2400", words: "Hello world" }],
           },
         };
       },
@@ -236,6 +247,8 @@ test("falls back to Spotify when LRCLIB has no valid word timing", async () => {
   assert.equal(result.provider, "spotify");
   assert.equal(result.wordTiming, "interpolated");
   assert.equal(result.lines[0].text, "Hello world");
+  assert.equal(result.lines[0].endMs, 2400);
+  assert.equal(result.lines[0].words.at(-1).endMs, 2400);
 });
 
 test("shows Spotify unsynced lyrics instead of reporting none", async () => {
@@ -301,6 +314,42 @@ test("uses accurate Spotify syllable timestamps when provided", async () => {
   assert.equal(result.syncType, "SYLLABLE_SYNCED");
   assert.equal(result.wordTiming, "real");
   assert.deepEqual(result.lines[0].words.map(({ startMs, endMs }) => [startMs, endMs]), [[1000, 1500], [1500, 2100]]);
+});
+
+test("falls back to Spotify line timing when syllable text disagrees with the lyric", async () => {
+  globalThis.fetch = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => [{
+      trackName: track.title,
+      artistName: track.artist,
+      duration: track.durationSec,
+      syncedLyrics: "[00:01.00]Hello world",
+    }],
+  });
+  globalThis.Spicetify = {
+    CosmosAsync: {
+      get: async () => ({
+        lyrics: {
+          syncType: "SYLLABLE_SYNCED",
+          lines: [{
+            startTimeMs: "1000",
+            endTimeMs: "2100",
+            words: "Hello world",
+            syllables: [
+              { text: "Wrong ", startTimeMs: "1000", endTimeMs: "1500" },
+              { text: "words", startTimeMs: "1500", endTimeMs: "2100" },
+            ],
+          }],
+        },
+      }),
+    },
+  };
+
+  const result = await resolveLyrics(track);
+  assert.equal(result.provider, "spotify");
+  assert.equal(result.syncType, "LINE_SYNCED");
+  assert.equal(result.lines[0].text, "Hello world");
 });
 
 test("uses LRCLIB synced lyrics when Spotify has no lyrics", async () => {

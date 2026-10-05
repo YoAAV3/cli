@@ -16,6 +16,8 @@ import { toAMLLLines } from "./amll-map.js";
 const React = Spicetify.React;
 const PLAYER_SAMPLE_MS = 200;
 const SEEK_THRESHOLD_MS = 750;
+const BACKGROUND_RENDER_SCALE = 0.8;
+const BACKGROUND_RENDER_MAX_DPR = 1.25;
 
 // AMLL core stylesheet, injected once (bundled as text — no extra files).
 try {
@@ -75,7 +77,7 @@ function LyriclyApp() {
 			return false;
 		}
 		try {
-			if (am.bg) am.bg.setHasLyric(amLines.length > 0);
+			if (am.background) am.background.setHasLyric(amLines.length > 0);
 		} catch (e) {}
 		return true;
 	};
@@ -86,9 +88,9 @@ function LyriclyApp() {
 		const am = amRef.current;
 		const info = trackInfo();
 		setUi((s) => ({ ...s, phase: "loading", info, staticLines: null }));
+		try { am && am.player.setLyricLines([], 0); } catch (e) {}
 		if (!info.title) {
 			setUi((s) => ({ ...s, phase: "idle", info }));
-			try { am && am.player.setLyricLines([], 0); } catch (e) {}
 			return;
 		}
 		const usePack = (pack, cached) => {
@@ -151,11 +153,17 @@ function LyriclyApp() {
 	React.useEffect(() => {
 		// Init AMLL instances once, mount into the host container.
 		let player = null, background = null;
+		const backgroundRenderScale = () => {
+			const dpr = Number(window.devicePixelRatio) || 1;
+			return Math.min(BACKGROUND_RENDER_SCALE, BACKGROUND_RENDER_MAX_DPR / dpr);
+		};
+		let initialRenderScale = backgroundRenderScale();
 		try {
 			player = new LyricPlayer();
 			background = BackgroundRender.new(MeshGradientRenderer);
 			try { background.setFPS(30); } catch (e) {}
-			try { background.setRenderScale(0.8); } catch (e) {}
+			initialRenderScale = backgroundRenderScale();
+			try { background.setRenderScale(initialRenderScale); } catch (e) {}
 			try {
 				if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
 					background.setStaticMode(true);
@@ -174,6 +182,7 @@ function LyriclyApp() {
 			player, background, raf: 0, lastRaw: null, lastFrame: -1,
 			anchorProgress: 0, anchorAt: 0, lastPlayerSample: 0,
 			anchorDuration: 0, lastPushed: -1, isPlaying: false,
+			renderScale: initialRenderScale, backgroundRenderScale,
 		};
 
 		try {
@@ -194,9 +203,12 @@ function LyriclyApp() {
 		const frame = (now) => {
 			const am = amRef.current;
 			if (!am) return;
+			if (document.hidden) {
+				am.raf = 0;
+				return;
+			}
 			am.raf = requestAnimationFrame(frame);
 			try {
-				if (document.hidden) return;
 				const dt = am.lastFrame < 0 ? 0 : Math.min(now - am.lastFrame, 100);
 				am.lastFrame = now;
 				const spotifyPlayer = Spicetify.Player;
@@ -247,8 +259,61 @@ function LyriclyApp() {
 			} catch (e) {}
 		};
 		amRef.current.raf = requestAnimationFrame(frame);
+		const onVisibilityChange = () => {
+			const am = amRef.current;
+			if (!am) return;
+			if (document.hidden) {
+				if (am.raf) cancelAnimationFrame(am.raf);
+				am.raf = 0;
+				try { am.player.pause(); } catch (e) {}
+				try { am.background.pause(); } catch (e) {}
+				am.anchorAt = 0;
+				am.lastPlayerSample = 0;
+				am.lastFrame = -1;
+				am.lastPushed = -1;
+			} else if (!am.raf) {
+				try {
+					am.isPlaying = !!Spicetify.Player.isPlaying();
+					if (am.isPlaying) {
+						am.player.resume();
+						am.background.resume();
+					} else {
+						am.player.pause();
+						am.background.pause();
+					}
+				} catch (e) {}
+				am.raf = requestAnimationFrame(frame);
+			}
+		};
+		document.addEventListener("visibilitychange", onVisibilityChange);
+		const onResize = () => {
+			const am = amRef.current;
+			if (!am) return;
+			const scale = am.backgroundRenderScale();
+			if (scale !== am.renderScale) {
+				am.renderScale = scale;
+				try { am.background.setRenderScale(scale); } catch (e) {}
+			}
+		};
+		window.addEventListener("resize", onResize);
+
+		const pushArt = () => {
+			try {
+				const u = (trackInfo() || {}).art;
+				const am2 = amRef.current;
+				if (u && am2 && am2.lastArt !== u) {
+					am2.lastArt = u;
+					Promise.resolve()
+						.then(() => am2.background.setAlbum(u))
+						.catch((e) => console.warn("[lyricly] album art update failed.", e));
+				}
+			} catch (e) {
+				console.warn("[lyricly] album art lookup failed.", e);
+			}
+		};
 
 		const onSongChange = () => {
+			pushArt();
 			try {
 				const am2 = amRef.current;
 				if (am2) {
@@ -277,38 +342,20 @@ function LyriclyApp() {
 		};
 		try { window.addEventListener("keydown", onKey, true); } catch (e) {}
 
-		// Album art -> background (CORS permitting; failures keep prior art).
-		const artTimer = { id: 0 };
-		const pushArt = () => {
-			try {
-				const u = (trackInfo() || {}).art;
-				const am2 = amRef.current;
-				if (u && am2 && am2.lastArt !== u) {
-					am2.lastArt = u;
-					Promise.resolve()
-						.then(() => am2.bg.setAlbum(u))
-						.catch(() => {});
-				}
-			} catch (e) {}
-		};
-		const artCheck = () => {
-			pushArt();
-			artTimer.id = setTimeout(artCheck, 3000);
-		};
-		artCheck();
-
+		pushArt();
 		loadTrack();
 		return () => {
 			loadVersionRef.current++;
 			try { cancelAnimationFrame(amRef.current ? amRef.current.raf : 0); } catch (e) {}
 			try { Spicetify.Player.removeEventListener("songchange", onSongChange); } catch (e) {}
+			try { document.removeEventListener("visibilitychange", onVisibilityChange); } catch (e) {}
+			try { window.removeEventListener("resize", onResize); } catch (e) {}
 			try { window.removeEventListener("keydown", onKey, true); } catch (e) {}
-			try { clearTimeout(artTimer.id); } catch (e) {}
 		 try {
 				const am2 = amRef.current;
 				amRef.current = null;
 				if (am2) {
-					try { am2.bg && am2.bg.dispose(); } catch (e) {}
+					try { am2.background && am2.background.dispose(); } catch (e) {}
 					try { am2.player && am2.player.dispose(); } catch (e) {}
 				}
 			} catch (e) {}

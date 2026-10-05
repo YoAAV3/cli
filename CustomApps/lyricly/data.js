@@ -94,22 +94,26 @@ async function fetchSpotifyLyrics(info) {
 				const words = syllables.map((syllable) => {
 					const startMs = Number(syllable.startTimeMs);
 					const endMs = Number(syllable.endTimeMs);
-					if (!syllable.text || !Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) return null;
+					if (!syllable.text || !Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs < 0 || endMs <= startMs) return null;
 					return { text: String(syllable.text), startMs, endMs };
 				});
-				if (!words.length || words.some((word) => !word)) return null;
+				if (!words.length || words.some((word, index) =>
+					!word || (index > 0 && word.startMs < words[index - 1].endMs))) return null;
 				const startMs = Number(line.startTimeMs);
 				const endMs = Math.max(Number(line.endTimeMs) || 0, words[words.length - 1].endMs);
+				const text = String(line.words || words.map((word) => word.text).join("")).trim();
+				const normalize = (value) => value.replace(/\s+/g, " ").trim();
+				if (normalize(words.map((word) => word.text).join("")) !== normalize(text)) return null;
 				return {
-					startMs: Number.isFinite(startMs) ? startMs : words[0].startMs,
+					startMs: Number.isFinite(startMs) && startMs >= 0 ? startMs : words[0].startMs,
 					endMs,
-					text: String(line.words || words.map((word) => word.text).join("")).trim(),
+					text,
 					words,
 				};
 			}).filter(Boolean);
-			return lines.length ? { syncType: "SYLLABLE_SYNCED", lines } : null;
+			if (lines.length === lyrics.lines.length) return { syncType: "SYLLABLE_SYNCED", lines };
 		}
-		if (lyrics.syncType !== "LINE_SYNCED") {
+		if (lyrics.syncType !== "LINE_SYNCED" && lyrics.syncType !== "SYLLABLE_SYNCED") {
 			console.info("[lyricly] Spotify lyric sync type is unsupported.", {
 				trackId,
 				syncType: lyrics.syncType,
@@ -117,8 +121,12 @@ async function fetchSpotifyLyrics(info) {
 			return null;
 		}
 		const raw = lyrics.lines
-			.map((l) => ({ startMs: Number(l.startTimeMs), text: String(l.words || "").trim().replace(/\s+/g, " ") }))
-			.filter((l) => l.text && isFinite(l.startMs) && l.startMs >= 0);
+			.map((l) => ({
+				startMs: Number(l.startTimeMs),
+				endMs: Number(l.endTimeMs),
+				text: String(l.words || "").trim().replace(/\s+/g, " "),
+			}))
+			.filter((l) => l.text && Number.isFinite(l.startMs) && l.startMs >= 0);
 		raw.sort((a, b) => a.startMs - b.startMs);
 		if (!raw.length) {
 			console.info("[lyricly] Spotify returned an empty line-synced lyric list.", trackId);
@@ -132,15 +140,22 @@ async function fetchSpotifyLyrics(info) {
 }
 
 function shapeLines(raw, durationMs) {
-	// raw: [{startMs, text}] sorted in. Assigns each line an end (next
-	// line's start, else track duration, else start + 4s) and spreads its
-	// words across the window weighted by syllable count — the honest
-	// estimate that drives the word-by-word highlight.
+	// Preserve source line ends when available. Otherwise use the next
+	// distinct line timestamp, then track duration as the best LRC estimate.
 	const lines = (raw || []).filter((l) => l && l.text && isFinite(l.startMs) && l.startMs >= 0);
 	return lines.map((l, i) => {
 		const fallback = durationMs > l.startMs ? durationMs : l.startMs + 4000;
-		const nextStart = i + 1 < lines.length ? lines[i + 1].startMs : 0;
-		const end = nextStart > l.startMs ? nextStart : fallback;
+		let nextStart = 0;
+		for (let j = i + 1; j < lines.length; j++) {
+			if (lines[j].startMs > l.startMs) {
+				nextStart = lines[j].startMs;
+				break;
+			}
+		}
+		const providedEnd = Number(l.endMs);
+		const end = Number.isFinite(providedEnd) && providedEnd > l.startMs
+			? (durationMs > l.startMs ? Math.min(providedEnd, durationMs) : providedEnd)
+			: nextStart > l.startMs ? nextStart : fallback;
 		const endMs = Math.max(end, l.startMs + 1);
 		const tokens = l.text.split(/\s+/).filter(Boolean);
 		const weights = tokens.map((w) => Math.max(1, countSyllables(w)));

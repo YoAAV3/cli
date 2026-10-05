@@ -27,55 +27,30 @@
 		setInterval(enforceTitle, 2000);
 	} catch (e) {}
 
-	// Keep Lyricly's identity beside notifications, not as a duplicate item
-	// in the navigation rail. Spotify can re-render its header at any time,
-	// so this deliberately runs again after each such render.
-	var TOPBAR_LOGO_SRC = "/assets/lyricly/logo.png";
+	// Keep the custom route available to Spotify's native lyrics button
+	// without exposing a separate Lyricly navigation item.
 	function removeLegacyLyriclyButton() {
 		try {
 			var oldLinks = document.querySelectorAll(
+				"li[data-id*='lyricly' i], a[href*='lyricly' i], " +
 				".custom-navlink[aria-label='Lyricly'], .main-globalNav-navLink[aria-label='Lyricly']"
 			);
 			for (var i = 0; i < oldLinks.length; i++) {
-				oldLinks[i].style.setProperty("display", "none", "important");
-				oldLinks[i].setAttribute("aria-hidden", "true");
-				oldLinks[i].tabIndex = -1;
+				var item = oldLinks[i].closest("li") || oldLinks[i];
+				item.style.setProperty("display", "none", "important");
+				item.setAttribute("aria-hidden", "true");
+				item.tabIndex = -1;
 			}
 		} catch (e) {}
 	}
-	function findNotificationsButton() {
-		try {
-			var buttons = document.querySelectorAll("button");
-			for (var i = 0; i < buttons.length; i++) {
-				var label = ((buttons[i].getAttribute("aria-label") || "") + " " + (buttons[i].getAttribute("title") || "")).toLowerCase();
-				if (label.indexOf("notification") >= 0 || label.indexOf("what's new") >= 0) return buttons[i];
-			}
-		} catch (e) {}
-		return null;
-	}
-	function placeTopbarLogo() {
-		try {
-			var bell = findNotificationsButton();
-			if (!bell || !bell.parentElement) return;
-			var logo = document.getElementById("lyricly-topbar-logo");
-			if (!logo) {
-				logo = document.createElement("img");
-				logo.id = "lyricly-topbar-logo";
-				logo.src = TOPBAR_LOGO_SRC;
-				logo.alt = "Lyricly";
-				logo.setAttribute("draggable", "false");
-				logo.style.cssText = "width:28px;height:28px;object-fit:contain;border-radius:8px;margin-right:9px;flex:none;pointer-events:none;";
-				bell.parentElement.insertBefore(logo, bell);
-			}
-		} catch (e) {}
-	}
-	function refreshTopbarIdentity() {
-		removeLegacyLyriclyButton();
-		placeTopbarLogo();
-	}
+	try { removeLegacyLyriclyButton(); } catch (e) {}
 	try {
-		refreshTopbarIdentity();
-		setInterval(refreshTopbarIdentity, 700);
+		if (!document.getElementById("lyricly-hide-app-link")) {
+			var navStyle = document.createElement("style");
+			navStyle.id = "lyricly-hide-app-link";
+			navStyle.textContent = "li[data-id*='lyricly' i],a[href*='lyricly' i]{display:none!important}";
+			document.head.appendChild(navStyle);
+		}
 	} catch (e) {}
 
 	// AMLL represents a completed word by moving its word mask to 0px. Its
@@ -365,13 +340,6 @@
 	// 2. Route Spotify's own lyrics button into Lyricly. Capture phase beats
 	// the native panel open, including when Spotify reports no lyrics.
 	function lyriclyHref() {
-		try {
-			var links = document.querySelectorAll('a[href*="lyricly" i]');
-			for (var i = 0; i < links.length; i++) {
-				var href = links[i].getAttribute("href");
-				if (href) return href;
-			}
-		} catch (e) {}
 		return "/lyricly";
 	}
 	function isLyricsButton(el) {
@@ -380,10 +348,8 @@
 				if (el.tagName === "BUTTON") {
 					var label = ((el.getAttribute && el.getAttribute("aria-label")) || "").toLowerCase();
 					if ((el.getAttribute("data-testid") || "").toLowerCase() === "lyrics-button") return true;
-					if (label.indexOf("lyric") >= 0 && label !== "lyricly") return true;
+					if (label === "lyrics" || label === "open lyrics") return true;
 				}
-				var testid = (el.getAttribute && el.getAttribute("data-testid")) || "";
-				if (testid.toLowerCase().indexOf("lyric") >= 0) return true;
 				el = el.parentElement;
 			}
 		} catch (e) {}
@@ -396,8 +362,6 @@
 				var button = buttons[i];
 				button.disabled = false;
 				button.removeAttribute("disabled");
-				button.setAttribute("aria-label", "Open Lyricly lyrics");
-				button.setAttribute("title", "Open Lyricly lyrics");
 			}
 		} catch (e) {}
 	}
