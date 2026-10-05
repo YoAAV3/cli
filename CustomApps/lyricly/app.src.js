@@ -15,6 +15,7 @@ import { toAMLLLines } from "./amll-map.js";
 
 const React = Spicetify.React;
 const PLAYER_SAMPLE_MS = 200;
+const LYRIC_FRAME_INTERVAL_MS = 1000 / 30;
 const SEEK_THRESHOLD_MS = 750;
 const BACKGROUND_RENDER_SCALE = 0.8;
 const BACKGROUND_RENDER_MAX_DPR = 1.25;
@@ -179,9 +180,9 @@ function LyriclyApp() {
 			return undefined;
 		}
 		amRef.current = {
-			player, background, raf: 0, lastRaw: null, lastFrame: -1,
+			player, background, raf: 0, lastRaw: null, lastUpdate: -1,
 			anchorProgress: 0, anchorAt: 0, lastPlayerSample: 0,
-			anchorDuration: 0, lastPushed: -1, isPlaying: false,
+			anchorDuration: 0, lastPushed: -1, isPlaying: null,
 			renderScale: initialRenderScale, backgroundRenderScale,
 		};
 
@@ -193,13 +194,16 @@ function LyriclyApp() {
 					if (isFinite(t) && t >= 0) {
 						seekPlayer(Math.round(t));
 						try { player.setCurrentTime(Math.round(t), true); } catch (e2) {}
+						if (!amRef.current || !amRef.current.isPlaying) {
+							try { player.update(0); } catch (e2) {}
+						}
 					}
 				} catch (e2) {}
 			});
 		} catch (e) {}
 
-		// Interpolate between player samples and drive AMLL every animation
-		// frame; getProgress itself is not guaranteed to advance every frame.
+		// Spotify's progress API advances less often than the display, so
+		// interpolate between samples while limiting AMLL work to 30 FPS.
 		const frame = (now) => {
 			const am = amRef.current;
 			if (!am) return;
@@ -208,22 +212,11 @@ function LyriclyApp() {
 				return;
 			}
 			am.raf = requestAnimationFrame(frame);
+			if (am.lastUpdate >= 0 && now - am.lastUpdate < LYRIC_FRAME_INTERVAL_MS) return;
 			try {
-				const dt = am.lastFrame < 0 ? 0 : Math.min(now - am.lastFrame, 100);
-				am.lastFrame = now;
+				const dt = am.lastUpdate < 0 ? 0 : Math.min(now - am.lastUpdate, 100);
+				am.lastUpdate = now;
 				const spotifyPlayer = Spicetify.Player;
-				let playing = false;
-				try { playing = !!(spotifyPlayer && spotifyPlayer.isPlaying()); } catch (e) {}
-				if (playing !== am.isPlaying) {
-					am.isPlaying = playing;
-					if (playing) {
-						try { player.resume(); } catch (e) {}
-						try { background.resume(); } catch (e) {}
-					} else {
-						try { player.pause(); } catch (e) {}
-						try { background.pause(); } catch (e) {}
-					}
-				}
 				if (!am.anchorAt || now - am.lastPlayerSample >= PLAYER_SAMPLE_MS) {
 					let raw = am.anchorProgress;
 					try { raw = Number(spotifyPlayer.getProgress()) || 0; } catch (e) {}
@@ -258,7 +251,42 @@ function LyriclyApp() {
 				try { player.update(dt); } catch (e) {}
 			} catch (e) {}
 		};
-		amRef.current.raf = requestAnimationFrame(frame);
+		const onPlayPause = (eventOrForce = false) => {
+			const am = amRef.current;
+			if (!am) return;
+			const force = eventOrForce === true;
+			let playing = false;
+			try { playing = !!Spicetify.Player.isPlaying(); } catch (e) {}
+			if (!force && playing === am.isPlaying) return;
+			am.isPlaying = playing;
+			am.lastUpdate = -1;
+			am.lastPlayerSample = 0;
+			am.anchorAt = 0;
+			if (playing && !document.hidden) {
+				try { player.resume(); } catch (e) {}
+				try { background.resume(); } catch (e) {}
+				if (!am.raf) am.raf = requestAnimationFrame(frame);
+				return;
+			}
+			if (am.raf) cancelAnimationFrame(am.raf);
+			am.raf = 0;
+			if (!playing) {
+				let raw = 0;
+				try { raw = Number(Spicetify.Player.getProgress()) || 0; } catch (e) {}
+				let duration = 0;
+				try { duration = Number(Spicetify.Player.getDuration()) || 0; } catch (e) {}
+				const now = performance.now();
+				am.anchorProgress = Math.max(0, duration > 0 ? Math.min(raw, duration) : raw);
+				am.anchorDuration = duration;
+				am.anchorAt = now;
+				am.lastPlayerSample = now;
+				try { player.setCurrentTime(Math.round(am.anchorProgress)); } catch (e) {}
+				try { player.update(0); } catch (e) {}
+				am.lastPushed = am.anchorProgress;
+			}
+			try { player.pause(); } catch (e) {}
+			try { background.pause(); } catch (e) {}
+		};
 		const onVisibilityChange = () => {
 			const am = amRef.current;
 			if (!am) return;
@@ -269,21 +297,9 @@ function LyriclyApp() {
 				try { am.background.pause(); } catch (e) {}
 				am.anchorAt = 0;
 				am.lastPlayerSample = 0;
-				am.lastFrame = -1;
+				am.lastUpdate = -1;
 				am.lastPushed = -1;
-			} else if (!am.raf) {
-				try {
-					am.isPlaying = !!Spicetify.Player.isPlaying();
-					if (am.isPlaying) {
-						am.player.resume();
-						am.background.resume();
-					} else {
-						am.player.pause();
-						am.background.pause();
-					}
-				} catch (e) {}
-				am.raf = requestAnimationFrame(frame);
-			}
+			} else onPlayPause(true);
 		};
 		document.addEventListener("visibilitychange", onVisibilityChange);
 		const onResize = () => {
@@ -328,6 +344,7 @@ function LyriclyApp() {
 			loadTrack();
 		};
 		try { Spicetify.Player.addEventListener("songchange", onSongChange); } catch (e) {}
+		try { Spicetify.Player.addEventListener("onplaypause", onPlayPause); } catch (e) {}
 
 		const onKey = (e) => {
 			try {
@@ -344,10 +361,12 @@ function LyriclyApp() {
 
 		pushArt();
 		loadTrack();
+		onPlayPause(true);
 		return () => {
 			loadVersionRef.current++;
 			try { cancelAnimationFrame(amRef.current ? amRef.current.raf : 0); } catch (e) {}
 			try { Spicetify.Player.removeEventListener("songchange", onSongChange); } catch (e) {}
+			try { Spicetify.Player.removeEventListener("onplaypause", onPlayPause); } catch (e) {}
 			try { document.removeEventListener("visibilitychange", onVisibilityChange); } catch (e) {}
 			try { window.removeEventListener("resize", onResize); } catch (e) {}
 			try { window.removeEventListener("keydown", onKey, true); } catch (e) {}
