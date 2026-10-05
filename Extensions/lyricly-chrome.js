@@ -97,6 +97,271 @@
 	}
 	try { setInterval(markCompletedLyricWords, 80); } catch (e) {}
 
+	// Fullscreen companion: a real now-playing card driven from Spotify's
+	// current item, while AMLL remains the live lyric surface on the right.
+	function fullscreenTrack() {
+		try {
+			var item = window.Spicetify && Spicetify.Player && Spicetify.Player.data && Spicetify.Player.data.item;
+			if (!item) return null;
+			var album = item.album || {};
+			var images = album.images || item.images || [];
+			return {
+				title: item.name || item.metadata && item.metadata.title || "Unknown track",
+				artist: (Array.isArray(item.artists) && item.artists.map(function (entry) { return entry.name; }).filter(Boolean).join(", ")) || item.metadata && item.metadata.artist_name || "Unknown artist",
+				art: images[0] && (images[0].url || images[0]) || ""
+			};
+		} catch (e) { return null; }
+	}
+	function formatTrackTime(ms) {
+		var seconds = Math.floor(Math.max(0, Number(ms) || 0) / 1000);
+		return Math.floor(seconds / 60) + ":" + String(seconds % 60).padStart(2, "0");
+	}
+	function playerIcon(name) {
+		var paths = {
+			previous: '<path d="M6 5h2v14H6zM19 6v12l-9-6z"/>',
+			next: '<path d="M16 5h2v14h-2zM5 6v12l9-6z"/>',
+			play: '<path d="M8 5v14l11-7z"/>',
+			pause: '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>',
+			volume: '<path d="M3 9v6h4l5 4V5L7 9zm11.5-.5v7a4 4 0 0 0 0-7zm0-4v2a7 7 0 0 1 0 11v2a9 9 0 0 0 0-15z"/>',
+			mute: '<path d="M3 9v6h4l5 4V5L7 9zm11.5 0 1.5 1.5L17.5 9 19 10.5 17.5 12 19 13.5 17.5 15 16 13.5 14.5 15 13 13.5l1.5-1.5L13 10.5z"/>',
+		};
+		return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + (paths[name] || "") + "</svg>";
+	}
+	var fullscreenOverlay = null;
+	var fullscreenRoot = null;
+	var fullscreenRootParent = null;
+	var fullscreenRootNextSibling = null;
+	var fullscreenActive = false;
+	function ensureFullscreenStyles() {
+		if (document.getElementById("lyricly-fullscreen-overlay-style")) return;
+		var style = document.createElement("style");
+		style.id = "lyricly-fullscreen-overlay-style";
+		style.textContent =
+			"html.lyricly-fullscreen,body.lyricly-fullscreen{width:100%!important;height:100%!important;min-height:100%!important;margin:0!important;overflow:hidden!important;background:#08080d!important}" +
+			"body.lyricly-fullscreen>:not(#lyricly-fullscreen-overlay){display:none!important;visibility:hidden!important}" +
+			"#lyricly-fullscreen-overlay,#lyricly-fullscreen-overlay:fullscreen{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;height:100dvh!important;min-width:100vw!important;min-height:100vh!important;min-height:100dvh!important;z-index:2147483647!important;display:block!important;overflow:hidden!important;background:#08080d!important;isolation:isolate!important}" +
+			"#lyricly-fullscreen-overlay>.lyricly-root{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;min-height:0!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;overflow:hidden!important;z-index:1!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-player{position:absolute!important;inset:0!important;width:100%!important;height:100%!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-player canvas{opacity:.16!important;filter:blur(30px) grayscale(.45) saturate(.55)!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-player .amll-lyric-player{width:52vw!important;margin-left:43vw!important;padding-top:7vh!important;--amll-lp-width:100%!important;filter:none!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-player .FmKaba_lyricMainLine{font-size:clamp(30px,3.45vw,58px)!important;line-height:1.14!important;letter-spacing:-.025em!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-player .FmKaba_lyricLineWrapper{padding-right:4vw!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-backdrop{position:absolute!important;inset:0!important;z-index:0!important;overflow:hidden!important;pointer-events:none!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-backdrop img{width:100%!important;height:100%!important;object-fit:cover!important;filter:blur(42px) brightness(.56) saturate(.58)!important;transform:scale(1.08)!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-backdrop:after{content:''!important;position:absolute!important;inset:0!important;background:linear-gradient(90deg,rgba(28,29,39,.34),rgba(15,17,28,.66)),linear-gradient(0deg,rgba(5,6,12,.28),rgba(13,14,22,.06))!important}" +
+			"#lyricly-fullscreen-overlay #lyricly-fullscreen-now{position:absolute!important;left:clamp(34px,6.5vw,112px)!important;top:50%!important;transform:translateY(-50%)!important;z-index:80!important;width:min(25vw,340px)!important;color:#fff!important;font-family:inherit!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-art{display:block!important;width:100%!important;aspect-ratio:1!important;object-fit:cover!important;border-radius:22px!important;box-shadow:0 26px 70px rgba(0,0,0,.42)!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-meta{margin-top:22px!important;display:grid!important;gap:6px!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-meta strong{font-size:clamp(18px,1.65vw,26px)!important;line-height:1.15!important;font-weight:700!important;color:#fff!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-meta span{color:rgba(255,255,255,.68)!important;font-size:clamp(15px,1.25vw,20px)!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-progress{margin-top:18px!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-progress input{display:block!important;width:100%!important;height:16px!important;margin:0!important;padding:0!important;appearance:none!important;-webkit-appearance:none!important;border:0!important;border-radius:999px!important;background:linear-gradient(to right,rgba(255,255,255,.97) 0 var(--seek-progress,0%),rgba(255,255,255,.34) var(--seek-progress,0%) 100%)!important;cursor:pointer!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-progress input::-webkit-slider-runnable-track{height:12px!important;border-radius:999px!important;background:transparent!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-progress input::-webkit-slider-thumb{width:0!important;height:0!important;appearance:none!important;-webkit-appearance:none!important;border:0!important;background:transparent!important;box-shadow:none!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-progress input::-moz-range-track{height:12px!important;border-radius:999px!important;background:rgba(255,255,255,.34)!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-progress input::-moz-range-progress{height:12px!important;border-radius:999px!important;background:rgba(255,255,255,.97)!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-progress input::-moz-range-thumb{width:0!important;height:0!important;border:0!important;background:transparent!important;box-shadow:none!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-progress input:focus-visible{outline:2px solid rgba(255,255,255,.8)!important;outline-offset:4px!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-times{display:flex!important;justify-content:space-between!important;margin-top:8px!important;color:rgba(255,255,255,.66)!important;font-size:13px!important;font-variant-numeric:tabular-nums!important;letter-spacing:.01em!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-controls{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:18px!important;margin-top:18px!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-transport{display:flex!important;align-items:center!important;gap:clamp(16px,2.4vw,32px)!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-controls button{display:grid!important;place-items:center!important;border:0!important;padding:0!important;background:transparent!important;color:rgba(255,255,255,.88)!important;font:inherit!important;cursor:pointer!important;transition:transform .16s ease,color .16s ease!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-controls button:hover{color:#fff!important;transform:scale(1.1)!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-controls button svg,#lyricly-fullscreen-overlay .lyricly-fs-volume-icon svg{display:block!important;width:22px!important;height:22px!important;fill:currentColor!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-controls .lyricly-fs-skip{width:34px!important;height:38px!important;color:rgba(255,255,255,.83)!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-controls .lyricly-fs-play{width:52px!important;height:52px!important;border-radius:50%!important;background:#fff!important;color:#17171b!important;box-shadow:0 5px 22px rgba(0,0,0,.3)!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-controls .lyricly-fs-play svg{width:23px!important;height:23px!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-volume{display:flex!important;align-items:center!important;gap:10px!important;width:min(120px,34%)!important;color:rgba(255,255,255,.85)!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-volume-icon svg{width:19px!important;height:19px!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-fs-volume input{width:100%!important;height:4px!important;appearance:none!important;-webkit-appearance:none!important;border:0!important;border-radius:999px!important;background:linear-gradient(to right,#fff 0 var(--volume-progress,50%),rgba(255,255,255,.34) var(--volume-progress,50%) 100%)!important;cursor:pointer!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-static{position:absolute!important;inset:9vh 6vw 8vh 43vw!important;overflow:auto!important;padding:0 1vw!important;text-align:left!important;font-size:clamp(20px,2.25vw,34px)!important;line-height:1.55!important;font-weight:650!important;color:rgba(255,255,255,.9)!important;text-shadow:0 1px 12px rgba(0,0,0,.28)!important;z-index:50!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-empty{position:absolute!important;inset:0 4vw 0 43vw!important;display:grid!important;place-content:center!important;padding:0!important;text-align:left!important;font-size:clamp(20px,2vw,30px)!important;color:rgba(255,255,255,.82)!important;z-index:50!important}" +
+			"#lyricly-fullscreen-overlay .lyricly-hint{font-size:14px!important;color:rgba(255,255,255,.56)!important}" +
+			"@media(max-width:760px){#lyricly-fullscreen-overlay .lyricly-player .amll-lyric-player{width:86vw!important;margin-left:7vw!important}#lyricly-fullscreen-overlay #lyricly-fullscreen-now{display:grid!important;left:16px!important;right:16px!important;top:auto!important;bottom:16px!important;transform:none!important;width:auto!important;grid-template-columns:64px minmax(0,1fr)!important;gap:8px 12px!important;align-items:center!important;padding:12px!important;border:1px solid rgba(255,255,255,.16)!important;border-radius:20px!important;background:rgba(14,15,24,.70)!important;backdrop-filter:blur(24px)!important}#lyricly-fullscreen-overlay .lyricly-fs-art{grid-column:1!important;grid-row:1/span 2!important;width:64px!important;border-radius:12px!important}#lyricly-fullscreen-overlay .lyricly-fs-meta{grid-column:2!important;margin-top:0!important;gap:3px!important}#lyricly-fullscreen-overlay .lyricly-fs-meta strong{font-size:16px!important}#lyricly-fullscreen-overlay .lyricly-fs-meta span{font-size:13px!important}#lyricly-fullscreen-overlay .lyricly-fs-progress,#lyricly-fullscreen-overlay .lyricly-fs-controls{grid-column:1/-1!important}#lyricly-fullscreen-overlay .lyricly-fs-progress{margin-top:2px!important}#lyricly-fullscreen-overlay .lyricly-fs-controls{margin-top:0!important}#lyricly-fullscreen-overlay .lyricly-static{inset:7vh 6vw 245px!important;padding:0!important;text-align:center!important;font-size:clamp(18px,4.5vw,28px)!important}#lyricly-fullscreen-overlay .lyricly-empty{inset:6vh 8vw auto!important;text-align:center!important}}" +
+			"body.lyricly-fullscreen .Root__nav-bar,body.lyricly-fullscreen .Root__globalNav,body.lyricly-fullscreen .Root__top-bar,body.lyricly-fullscreen .Root__top-container,body.lyricly-fullscreen .Root__left-sidebar,body.lyricly-fullscreen .Root__right-sidebar,body.lyricly-fullscreen .Root__now-playing-bar,body.lyricly-fullscreen .Root__lyrics-cinema,body.lyricly-fullscreen .main-topBar-container,body.lyricly-fullscreen .main-nowPlayingBar-nowPlayingBar,body.lyricly-fullscreen [data-testid='left-sidebar'],body.lyricly-fullscreen [data-testid='right-sidebar'],body.lyricly-fullscreen [data-testid='top-bar'],body.lyricly-fullscreen [data-testid='now-playing-bar']{display:none!important}";
+		document.head.appendChild(style);
+	}
+	function activateFullscreen(root) {
+		ensureFullscreenStyles();
+		if (!fullscreenOverlay) {
+			fullscreenOverlay = document.createElement("div");
+			fullscreenOverlay.id = "lyricly-fullscreen-overlay";
+			document.body.appendChild(fullscreenOverlay);
+		}
+		if (root && root !== fullscreenRoot) {
+			fullscreenRoot = root;
+			fullscreenRootParent = root.parentNode;
+			fullscreenRootNextSibling = root.nextSibling;
+		}
+		if (fullscreenRoot && fullscreenRoot.parentNode !== fullscreenOverlay) {
+			fullscreenOverlay.appendChild(fullscreenRoot);
+		}
+		fullscreenActive = true;
+		document.documentElement.classList.add("lyricly-fullscreen");
+		document.body.classList.add("lyricly-fullscreen");
+		if (fullscreenRoot) fullscreenRoot.classList.add("lyricly-fullscreen");
+	}
+	function deactivateFullscreen() {
+		fullscreenActive = false;
+		document.documentElement.classList.remove("lyricly-fullscreen");
+		document.body.classList.remove("lyricly-fullscreen");
+		if (fullscreenRoot) fullscreenRoot.classList.remove("lyricly-fullscreen");
+		if (fullscreenRoot && fullscreenRootParent && fullscreenRootParent.isConnected) {
+			try {
+				if (fullscreenRootNextSibling && fullscreenRootNextSibling.parentNode === fullscreenRootParent) {
+					fullscreenRootParent.insertBefore(fullscreenRoot, fullscreenRootNextSibling);
+				} else {
+					fullscreenRootParent.appendChild(fullscreenRoot);
+				}
+			} catch (e) {
+				console.error("[lyricly-chrome] could not restore Lyricly after fullscreen.", e);
+			}
+		}
+		if (fullscreenOverlay) fullscreenOverlay.remove();
+		fullscreenOverlay = null;
+		fullscreenRoot = null;
+		fullscreenRootParent = null;
+		fullscreenRootNextSibling = null;
+	}
+	function syncFullscreenCompanion() {
+		try {
+			var root = document.querySelector(".lyricly-root");
+			if (fullscreenActive && root && root !== fullscreenRoot) activateFullscreen(root);
+			var active = fullscreenActive && !!fullscreenOverlay;
+			if (active) {
+				document.documentElement.classList.add("lyricly-fullscreen");
+				document.body.classList.add("lyricly-fullscreen");
+				if (fullscreenRoot && fullscreenRoot.parentNode !== fullscreenOverlay) fullscreenOverlay.appendChild(fullscreenRoot);
+			}
+			if (!active || !fullscreenRoot) {
+				var stale = document.getElementById("lyricly-fullscreen-now");
+				if (stale) stale.remove();
+				var staleBackdrop = root && root.querySelector(".lyricly-fs-backdrop");
+				if (staleBackdrop) staleBackdrop.remove();
+				return;
+			}
+			root = fullscreenRoot;
+			var backdrop = root.querySelector(".lyricly-fs-backdrop");
+			if (!backdrop) {
+				backdrop = document.createElement("div");
+				backdrop.className = "lyricly-fs-backdrop";
+				backdrop.setAttribute("aria-hidden", "true");
+				backdrop.innerHTML = "<img alt=\"\">";
+				root.insertBefore(backdrop, root.firstChild);
+			}
+			var card = document.getElementById("lyricly-fullscreen-now");
+			if (!card) {
+				card = document.createElement("aside");
+				card.id = "lyricly-fullscreen-now";
+				card.innerHTML =
+					'<img class="lyricly-fs-art" alt=""><div class="lyricly-fs-meta"><strong></strong><span></span></div>' +
+					'<div class="lyricly-fs-progress"><input class="lyricly-fs-seek" type="range" min="0" max="1" value="0" aria-label="Seek through track">' +
+					'<div class="lyricly-fs-times"><span class="lyricly-fs-elapsed">0:00</span><span class="lyricly-fs-remaining">-0:00</span></div></div>' +
+					'<div class="lyricly-fs-controls"><div class="lyricly-fs-transport">' +
+					'<button class="lyricly-fs-skip" data-player-action="back" aria-label="Previous track">' + playerIcon("previous") + '</button>' +
+					'<button class="lyricly-fs-play" data-player-action="toggle" aria-label="Play or pause">' + playerIcon("play") + '</button>' +
+					'<button class="lyricly-fs-skip" data-player-action="next" aria-label="Next track">' + playerIcon("next") + "</button></div>" +
+					'<label class="lyricly-fs-volume"><span class="lyricly-fs-volume-icon" aria-hidden="true">' + playerIcon("volume") +
+					'</span><input type="range" min="0" max="1" step="0.01" value="0.5" aria-label="Volume"></label></div>';
+				root.appendChild(card);
+				var buttons = card.querySelectorAll("[data-player-action]");
+				for (var i = 0; i < buttons.length; i++) {
+					buttons[i].addEventListener("click", function () {
+						try {
+							var player = window.Spicetify && window.Spicetify.Player;
+							var action = this.getAttribute("data-player-action");
+							if (player && action === "back") player.back();
+							else if (player && action === "next") player.next();
+							else if (player && action === "toggle") player.togglePlay();
+						} catch (e) {
+							console.error("[lyricly-chrome] fullscreen player control failed", e);
+						}
+					});
+				}
+				var seek = card.querySelector(".lyricly-fs-seek");
+				if (seek) {
+					seek.addEventListener("input", function () {
+						var duration = Math.max(1, Number(this.max) || 1);
+						this.style.setProperty("--seek-progress", (Number(this.value) / duration * 100) + "%");
+					});
+					seek.addEventListener("change", function () {
+						try {
+							var player = window.Spicetify && window.Spicetify.Player;
+							if (player && typeof player.seek === "function") player.seek(Number(this.value));
+						} catch (e) {
+							console.error("[lyricly-chrome] fullscreen seek failed", e);
+						}
+					});
+				}
+				var volume = card.querySelector(".lyricly-fs-volume input");
+				if (volume) {
+					volume.addEventListener("input", function () {
+						var value = Math.max(0, Math.min(1, Number(this.value)));
+						this.style.setProperty("--volume-progress", (value * 100) + "%");
+						var icon = card.querySelector(".lyricly-fs-volume-icon");
+						if (icon) icon.innerHTML = playerIcon(value === 0 ? "mute" : "volume");
+						try {
+							var player = window.Spicetify && window.Spicetify.Player;
+							if (player && typeof player.setVolume === "function") player.setVolume(value);
+						} catch (e) {
+							console.error("[lyricly-chrome] fullscreen volume control failed", e);
+						}
+					});
+				}
+			}
+			var track = fullscreenTrack();
+			if (!track) return;
+			var art = card.querySelector(".lyricly-fs-art");
+			var backdropArt = backdrop.querySelector("img");
+			var title = card.querySelector("strong");
+			var artist = card.querySelector("span");
+			if (track.art && art && art.src !== track.art) art.src = track.art;
+			if (track.art && backdropArt && backdropArt.src !== track.art) backdropArt.src = track.art;
+			if (art) art.alt = track.title + " album cover";
+			if (title) title.textContent = track.title;
+			if (artist) artist.textContent = track.artist;
+			var player = window.Spicetify && window.Spicetify.Player;
+			var duration = 0;
+			var progress = 0;
+			try { duration = player && typeof player.getDuration === "function" ? player.getDuration() : 0; } catch (e) {}
+			try { progress = player && typeof player.getProgress === "function" ? player.getProgress() : 0; } catch (e) {}
+			duration = Math.max(0, Number(duration) || 0);
+			progress = Math.min(duration || Infinity, Math.max(0, Number(progress) || 0));
+			var seekInput = card.querySelector(".lyricly-fs-seek");
+			if (seekInput) {
+				seekInput.max = String(duration || 1);
+				if (document.activeElement !== seekInput) {
+					seekInput.value = String(Math.min(progress, duration || 1));
+					seekInput.style.setProperty("--seek-progress", (duration ? progress / duration * 100 : 0) + "%");
+				}
+			}
+			var elapsed = card.querySelector(".lyricly-fs-elapsed");
+			var remaining = card.querySelector(".lyricly-fs-remaining");
+			if (elapsed) elapsed.textContent = formatTrackTime(progress);
+			if (remaining) remaining.textContent = "-" + formatTrackTime(Math.max(0, duration - progress));
+			var play = card.querySelector(".lyricly-fs-play");
+			if (play) {
+				var playing = false;
+				try { playing = !!(player && typeof player.isPlaying === "function" && player.isPlaying()); } catch (e) {}
+				play.innerHTML = playerIcon(playing ? "pause" : "play");
+				play.setAttribute("aria-label", playing ? "Pause" : "Play");
+			}
+			var volume = card.querySelector(".lyricly-fs-volume input");
+			if (volume) {
+				var currentVolume = 0.5;
+				try { currentVolume = player && typeof player.getVolume === "function" ? Number(player.getVolume()) : currentVolume; } catch (e) {}
+				currentVolume = Math.max(0, Math.min(1, Number.isFinite(currentVolume) ? currentVolume : 0.5));
+				if (document.activeElement !== volume) volume.value = String(currentVolume);
+				volume.style.setProperty("--volume-progress", (currentVolume * 100) + "%");
+				var volumeIcon = card.querySelector(".lyricly-fs-volume-icon");
+				if (volumeIcon && document.activeElement !== volume) volumeIcon.innerHTML = playerIcon(currentVolume === 0 ? "mute" : "volume");
+			}
+		} catch (e) {
+			console.error("[lyricly-chrome] fullscreen controls could not be updated.", e);
+		}
+	}
+	try { setInterval(syncFullscreenCompanion, 250); } catch (e) {}
+
 	// 2. Route Spotify's own lyrics button into Lyricly. Capture phase beats
 	// the native panel open, including when Spotify reports no lyrics.
 	function lyriclyHref() {
@@ -173,7 +438,10 @@
 	function isFullscreenButton(el) {
 		try {
 			while (el && el !== document.body) {
-				if (el.tagName === "BUTTON" && (el.getAttribute("data-testid") || "") === "fullscreen-mode-button") return true;
+				if (el.tagName === "BUTTON") {
+					var testid = ((el.getAttribute("data-testid") || "") + " " + (el.getAttribute("aria-label") || "") + " " + (el.getAttribute("title") || "")).toLowerCase();
+					if (testid.indexOf("fullscreen") >= 0 || testid.indexOf("full screen") >= 0) return true;
+				}
 				el = el.parentElement;
 			}
 		} catch (e) {}
@@ -182,26 +450,55 @@
 	try {
 		document.addEventListener("click", function (e) {
 			try {
-				if (!e || e.defaultPrevented || !isFullscreenButton(e.target)) return;
-				e.preventDefault();
-				e.stopPropagation();
-				try {
-					if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
-						document.documentElement.requestFullscreen().catch(function () {});
+				if (!e || !isFullscreenButton(e.target)) return;
+				if (typeof e.preventDefault === "function") e.preventDefault();
+				if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
+				else if (typeof e.stopPropagation === "function") e.stopPropagation();
+				if (fullscreenActive) {
+					if (document.fullscreenElement && typeof document.exitFullscreen === "function") {
+						document.exitFullscreen().then(deactivateFullscreen).catch(function (err) {
+							console.warn("[lyricly-chrome] could not exit fullscreen.", err);
+							deactivateFullscreen();
+						});
+					} else {
+						deactivateFullscreen();
 					}
-				} catch (err) {}
+					return;
+				}
+				var lyricRoot = document.querySelector(".lyricly-root");
+				activateFullscreen(lyricRoot);
+				if (!document.fullscreenElement && fullscreenOverlay && typeof fullscreenOverlay.requestFullscreen === "function") {
+					var request;
+					try {
+						request = fullscreenOverlay.requestFullscreen({ navigationUI: "hide" });
+					} catch (err) {
+						console.warn("[lyricly-chrome] fullscreen request failed.", err);
+					}
+					if (request && typeof request.catch === "function") {
+						request.catch(function (err) {
+							console.warn("[lyricly-chrome] could not enter Lyricly fullscreen.", err);
+						});
+					}
+				}
 				var H = window.Spicetify && window.Spicetify.Platform && window.Spicetify.Platform.History;
-				if (H && typeof H.push === "function") H.push(lyriclyHref());
-			} catch (err) {}
+				var href = lyriclyHref();
+				if (H && typeof H.push === "function" && window.location.pathname !== href) H.push(href);
+			} catch (err) {
+				console.error("[lyricly-chrome] fullscreen takeover failed.", err);
+			}
 		}, true);
 		document.addEventListener("fullscreenchange", function () {
 			try {
-				if (!document.fullscreenElement) {
-					var root = document.querySelector(".lyricly-root");
-					if (root) root.classList.remove("lyricly-fullscreen");
+				if (!document.fullscreenElement && fullscreenActive) {
+					deactivateFullscreen();
 				}
-			} catch (e) {}
+			} catch (e) {
+				console.error("[lyricly-chrome] fullscreen state update failed.", e);
+			}
 		});
+		document.addEventListener("keydown", function (e) {
+			if (e.key === "Escape" && fullscreenActive && !document.fullscreenElement) deactivateFullscreen();
+		}, true);
 	} catch (e) {}
 
 	// 4. Home declutter: hide the filter-chip row (All / Music / Podcasts /

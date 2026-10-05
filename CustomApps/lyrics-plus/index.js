@@ -116,7 +116,12 @@ try {
 	}
 } catch {
 	CONFIG.providersOrder = Object.keys(CONFIG.providers);
+}
+
+if (localStorage.getItem("lyrics-plus:lrclib-priority") !== "1") {
+	CONFIG.providersOrder = ["lrclib", ...CONFIG.providersOrder.filter((provider) => provider !== "lrclib")];
 	localStorage.setItem("lyrics-plus:services-order", JSON.stringify(CONFIG.providersOrder));
+	localStorage.setItem("lyrics-plus:lrclib-priority", "1");
 }
 
 CONFIG.locked = Number.parseInt(CONFIG.locked);

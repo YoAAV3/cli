@@ -8,14 +8,14 @@
 import { LyricPlayer, BackgroundRender, MeshGradientRenderer } from "@applemusic-like-lyrics/core";
 import coreCss from "@applemusic-like-lyrics/core/style.css";
 import {
-	cacheGet, cacheSet, logSyncType,
-	trackInfo, resolveLyrics, prefetchNext,
+	cacheGet, cacheSet,
+	trackInfo, resolveLyrics, interpolatePlaybackPosition,
 } from "./data.js";
 import { toAMLLLines } from "./amll-map.js";
 
 const React = Spicetify.React;
-const LOOKAHEAD_MS = 0; // added to display reads (output latency); default 0 per measured drift
-const STALL_PAUSE_MS = 800; // unchanged progress this long = paused
+const PLAYER_SAMPLE_MS = 200;
+const SEEK_THRESHOLD_MS = 750;
 
 // AMLL core stylesheet, injected once (bundled as text — no extra files).
 try {
@@ -25,7 +25,9 @@ try {
 		st.textContent = coreCss;
 		document.head.appendChild(st);
 	}
-} catch (e) {}
+} catch (e) {
+	console.error("[lyricly] AMLL stylesheet injection failed.", e);
+}
 
 function seekPlayer(ms) {
 	try {
@@ -56,24 +58,31 @@ function LyriclyApp() {
 	});
 	const hostRef = React.useRef(null);
 	const amRef = React.useRef(null); // { player, background, raf, lastRaw, lastChange, resumed, lastFrame, uri }
+	const loadVersionRef = React.useRef(0);
 
 	const setLines = (amLines, trackId) => {
 		const am = amRef.current;
-		if (!am) return;
+		if (!am) return false;
 		let pos = 0;
 		try { pos = Spicetify.Player.getProgress() || 0; } catch (e) {}
-		pos = Math.max(0, Math.round(pos + LOOKAHEAD_MS));
+		pos = Math.max(0, Math.round(pos));
 		try {
 			am.player.setLyricLines(amLines, pos);
 			am.player.setCurrentTime(pos, true);
 			am.player.update(0);
-		} catch (e) {}
+		} catch (e) {
+			console.error("[lyricly] renderer rejected the current lyrics.", { trackId, error: e });
+			return false;
+		}
 		try {
 			if (am.bg) am.bg.setHasLyric(amLines.length > 0);
 		} catch (e) {}
+		return true;
 	};
 
 	const loadTrack = async () => {
+		const requestId = ++loadVersionRef.current;
+		const isCurrentRequest = () => requestId === loadVersionRef.current;
 		const am = amRef.current;
 		const info = trackInfo();
 		setUi((s) => ({ ...s, phase: "loading", info, staticLines: null }));
@@ -82,9 +91,9 @@ function LyriclyApp() {
 			try { am && am.player.setLyricLines([], 0); } catch (e) {}
 			return;
 		}
-		const cacheKey = "lyricly:" + (info.uri || info.title + "|" + info.artist);
 		const usePack = (pack, cached) => {
-			if (!pack || !pack.lines || !pack.lines.length) return false;
+			if (!isCurrentRequest()) return true;
+			if (!pack || (!pack.instrumental && (!pack.lines || !pack.lines.length))) return false;
 			if (pack.instrumental) {
 				try { am.player.setLyricLines([], 0); } catch (e) {}
 				setUi((s) => ({ ...s, phase: "static", staticLines: ["♪ Instrumental ♪"], source: pack.provider }));
@@ -102,7 +111,15 @@ function LyriclyApp() {
 				}));
 				return true;
 			}
-			setLines(timed, pack.trackId);
+			if (!setLines(timed, pack.trackId)) {
+				console.warn("[lyricly] Showing static lyrics because the animated renderer rejected the track.");
+				setUi((s) => ({
+					...s, phase: "static",
+					staticLines: pack.lines.map((line) => line.text).filter(Boolean),
+					source: pack.provider + " (static fallback)",
+				}));
+				return true;
+			}
 			setUi((s) => ({
 				...s, phase: "ready", staticLines: null,
 				source: pack.provider + " · " + pack.syncType.toLowerCase().replace("_", "-") +
@@ -112,22 +129,23 @@ function LyriclyApp() {
 		};
 		const cached = info.uri && cacheGet(info.uri);
 		if (cached && usePack({ ...cached, trackId: info.trackId || info.uri }, true)) {
-			prefetchNext();
 			return;
 		}
 		try {
 			const pack = await resolveLyrics(info);
+			if (!isCurrentRequest()) return;
 			if (info.uri && pack && pack.lines && pack.lines.length && !pack.instrumental) {
 				cacheSet(info.uri, pack);
 			}
 			if (pack && usePack(pack, false)) {
-				prefetchNext();
 				return;
 			}
-		} catch (e) {}
+		} catch (e) {
+			console.error("[lyricly] lyric loading failed.", e);
+		}
+		if (!isCurrentRequest()) return;
 		try { am && am.player.setLyricLines([], 0); } catch (e2) {}
 		setUi((s) => ({ ...s, phase: "none", staticLines: null, source: "" }));
-		prefetchNext();
 	};
 
 	React.useEffect(() => {
@@ -136,8 +154,8 @@ function LyriclyApp() {
 		try {
 			player = new LyricPlayer();
 			background = BackgroundRender.new(MeshGradientRenderer);
-			try { background.setFPS(60); } catch (e) {}
-			try { background.setRenderScale(1); } catch (e) {}
+			try { background.setFPS(30); } catch (e) {}
+			try { background.setRenderScale(0.8); } catch (e) {}
 			try {
 				if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
 					background.setStaticMode(true);
@@ -152,7 +170,11 @@ function LyriclyApp() {
 			setUi((s) => ({ ...s, phase: "none" }));
 			return undefined;
 		}
-		amRef.current = { player, background, raf: 0, lastRaw: -1, lastChange: 0, resumed: false, lastFrame: -1 };
+		amRef.current = {
+			player, background, raf: 0, lastRaw: null, lastFrame: -1,
+			anchorProgress: 0, anchorAt: 0, lastPlayerSample: 0,
+			anchorDuration: 0, lastPushed: -1, isPlaying: false,
+		};
 
 		try {
 			player.addEventListener("line-click", (ev) => {
@@ -167,30 +189,59 @@ function LyriclyApp() {
 			});
 		} catch (e) {}
 
-		// Frame loop: dense progress pushes + presentation state, per guides.
+		// Interpolate between player samples and drive AMLL every animation
+		// frame; getProgress itself is not guaranteed to advance every frame.
 		const frame = (now) => {
 			const am = amRef.current;
 			if (!am) return;
 			am.raf = requestAnimationFrame(frame);
 			try {
 				if (document.hidden) return;
-				const dt = am.lastFrame < 0 ? 0 : now - am.lastFrame;
+				const dt = am.lastFrame < 0 ? 0 : Math.min(now - am.lastFrame, 100);
 				am.lastFrame = now;
-				let raw = 0;
-				try { raw = Spicetify.Player.getProgress() || 0; } catch (e) {}
-				if (raw !== am.lastRaw) {
-					am.lastRaw = raw;
-					am.lastChange = now;
-					if (!am.resumed) {
+				const spotifyPlayer = Spicetify.Player;
+				let playing = false;
+				try { playing = !!(spotifyPlayer && spotifyPlayer.isPlaying()); } catch (e) {}
+				if (playing !== am.isPlaying) {
+					am.isPlaying = playing;
+					if (playing) {
 						try { player.resume(); } catch (e) {}
 						try { background.resume(); } catch (e) {}
-						am.resumed = true;
+					} else {
+						try { player.pause(); } catch (e) {}
+						try { background.pause(); } catch (e) {}
 					}
-					try { player.setCurrentTime(Math.max(0, Math.round(raw + LOOKAHEAD_MS))); } catch (e) {}
-				} else if (now - am.lastChange > STALL_PAUSE_MS && am.resumed) {
-					try { player.pause(); } catch (e) {}
-					try { background.pause(); } catch (e) {}
-					am.resumed = false;
+				}
+				if (!am.anchorAt || now - am.lastPlayerSample >= PLAYER_SAMPLE_MS) {
+					let raw = am.anchorProgress;
+					try { raw = Number(spotifyPlayer.getProgress()) || 0; } catch (e) {}
+					let duration = 0;
+					try { duration = Number(spotifyPlayer.getDuration()) || 0; } catch (e) {}
+					am.anchorDuration = duration;
+					raw = Math.max(0, duration > 0 ? Math.min(raw, duration) : raw);
+					const hadAnchor = am.anchorAt > 0;
+					const predicted = interpolatePlaybackPosition(am.anchorProgress, am.anchorAt, now, am.isPlaying, duration);
+					const correction = raw - predicted;
+					if (!hadAnchor || Math.abs(correction) > SEEK_THRESHOLD_MS) {
+						am.anchorProgress = raw;
+						am.anchorAt = now;
+						if (hadAnchor && Math.abs(correction) > SEEK_THRESHOLD_MS) {
+							try { player.setCurrentTime(Math.round(raw), true); } catch (e) {}
+						}
+					} else if (!am.isPlaying) {
+						am.anchorProgress = raw;
+						am.anchorAt = now;
+					} else {
+						am.anchorProgress = Math.max(0, predicted + Math.max(-40, Math.min(40, correction * 0.25)));
+						am.anchorAt = now;
+					}
+					am.lastRaw = raw;
+					am.lastPlayerSample = now;
+				}
+				const position = interpolatePlaybackPosition(am.anchorProgress, am.anchorAt, now, am.isPlaying, am.anchorDuration);
+				if (Math.abs(position - am.lastPushed) >= 8) {
+					try { player.setCurrentTime(Math.round(position)); } catch (e) {}
+					am.lastPushed = position;
 				}
 				try { player.update(dt); } catch (e) {}
 			} catch (e) {}
@@ -200,7 +251,14 @@ function LyriclyApp() {
 		const onSongChange = () => {
 			try {
 				const am2 = amRef.current;
-				if (am2) { am2.lastRaw = -1; }
+				if (am2) {
+					am2.lastRaw = null;
+					am2.anchorProgress = 0;
+					am2.anchorAt = 0;
+					am2.lastPlayerSample = 0;
+					am2.anchorDuration = 0;
+					am2.lastPushed = -1;
+				}
 			} catch (e) {}
 			loadTrack();
 		};
@@ -241,6 +299,7 @@ function LyriclyApp() {
 
 		loadTrack();
 		return () => {
+			loadVersionRef.current++;
 			try { cancelAnimationFrame(amRef.current ? amRef.current.raf : 0); } catch (e) {}
 			try { Spicetify.Player.removeEventListener("songchange", onSongChange); } catch (e) {}
 			try { window.removeEventListener("keydown", onKey, true); } catch (e) {}
@@ -272,7 +331,7 @@ function LyriclyApp() {
 				? React.createElement("div", { className: "lyricly-empty" },
 					React.createElement("div", { className: "lyricly-none-art" }, "♪"),
 					React.createElement("div", null, "No lyrics found."),
-					React.createElement("div", { className: "lyricly-hint" }, "Checked Spotify first, then LRCLIB."))
+					React.createElement("div", { className: "lyricly-hint" }, "Checked LRCLIB word timing, then Spotify synced lyrics."))
 				: null,
 			ui.phase === "loading" || ui.phase === "idle"
 				? React.createElement("div", { className: "lyricly-empty" },

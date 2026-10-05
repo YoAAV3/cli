@@ -3,17 +3,21 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build:lyricly": "esbuild CustomApps/lyricly/app.src.js --bundle --format=iife --minify --target=chrome108 --loader:.css=text --outfile=CustomApps/lyricly/index.js",
     "build:wrapper": "node scripts/build-wrapper.mjs",
     "check:wrapper": "node scripts/build-wrapper.mjs --check",
     "fmt": "oxfmt scripts src/jsHelper/spicetifyWrapper package.json .oxfmtrc.json .oxlintrc.json",
     "fmt:check": "oxfmt --check scripts src/jsHelper/spicetifyWrapper package.json .oxfmtrc.json .oxlintrc.json",
-    "lint": "oxlint ."
+    "lint": "oxlint .",
+    "test:lyricly": "node --test CustomApps/lyricly/data.test.js"
   },
   "devDependencies": {
+    "@applemusic-like-lyrics/core": "0.6.0",
     "esbuild": "0.25.11",
     "oxfmt": "0.56.0",
     "oxlint": "1.71.0",
-    "oxlint-tsgolint": "0.23.0"
+    "oxlint-tsgolint": "0.23.0",
+    "yaml": "2.8.1"
   },
   "engines": {
     "node": ">=18",

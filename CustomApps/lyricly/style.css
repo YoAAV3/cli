@@ -69,24 +69,21 @@
 	/* Do not lift every lyric: contrast belongs exclusively to the active word. */
 	filter: none;
 }
-/* Noir veil over the AMLL canvas: black-to-wine gradient that pulls any
-   cover palette into brand range. Static layer, no animation, sits under
-   the lyric text. */
+/* Neutral veil for the AMLL canvas, kept subtle so album colors remain
+   recognizable without tinting the lyric text. */
 .lyricly-tint {
 	position: absolute;
 	inset: 0;
 	z-index: 1;
 	pointer-events: none;
-	background:
-		radial-gradient(120% 90% at 80% 10%, rgba(122, 14, 30, 0.35), transparent 60%),
-		linear-gradient(180deg, rgba(5, 3, 3, 0.55), rgba(5, 3, 3, 0.75));
+	background: linear-gradient(180deg, rgba(7, 8, 14, 0.28), rgba(7, 8, 14, 0.58));
 	/* Never dim the lyric renderer. The background renderer already provides
 	   the scene; removing this veil fixes the apparent dark overlay. */
 	display: none !important;
 }
-/* Interlude dots in accent red (pinned to core@0.6.0 class names). */
+/* Keep interlude markers neutral and legible against the album artwork. */
 .lyricly-player .amll-lyric-player .FmKaba_interludeDots > * {
-	background-color: #E0112B;
+	background-color: rgba(255, 255, 255, 0.72);
 }
 /* Bolder lyric type: outranks the bundled AMLL rules by specificity
    (hashed names below are pinned to core@0.6.0 — re-check on upgrade). */
@@ -102,7 +99,7 @@
 	--dark-mask-alpha: 0.34 !important;
 	color: #fff !important;
 	font-weight: 900 !important;
-	filter: brightness(3.8) contrast(1.8) !important;
+	filter: none !important;
 }
 /* AMLL applies a dim inline opacity to the active line wrapper. Remove only
    that wrapper fade; the per-word mask above still decides what is bright. */
@@ -113,7 +110,7 @@
 	color: #fff !important;
 	font-weight: 900 !important;
 	-webkit-text-stroke: 0 transparent !important;
-	filter: brightness(4) contrast(1.8) !important;
+	filter: none !important;
 	/* No animated neon trail: brightness comes from the white glyph itself. */
 	text-shadow: none !important;
 	/* AMLL animates mask-position inline.  Pin the mask's two actual alpha
@@ -134,7 +131,7 @@
 	opacity: 1 !important;
 	mask-image: none !important;
 	-webkit-mask-image: none !important;
-	filter: brightness(1.35) contrast(1.15) !important;
+	filter: none !important;
 	color: #fff !important;
 	text-shadow: none !important;
 }
@@ -160,6 +157,337 @@ html:fullscreen .lyricly-root .lyricly-player .amll-lyric-player {
 .lyricly-root.lyricly-fullscreen .lyricly-player .FmKaba_lyricMainLine.FmKaba_active,
 html:fullscreen .lyricly-root .lyricly-player .FmKaba_lyricMainLine.FmKaba_active {
 	--dark-mask-alpha: 0.34 !important;
+}
+/* Fullscreen: Noir's version of the Apple Music split view. The renderer
+   still owns timing and word sync; this only gives it a calm lyric column
+   beside live now-playing metadata/art supplied by the extension. */
+html:fullscreen .lyricly-root {
+	background: #08080d !important;
+}
+.lyricly-root:fullscreen {
+	position: fixed !important;
+	inset: 0 !important;
+	width: 100vw !important;
+	height: 100vh !important;
+	min-height: 100vh !important;
+	background: #08080d !important;
+}
+.lyricly-root:fullscreen,
+.lyricly-root.lyricly-fullscreen {
+	box-sizing: border-box !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	max-width: none !important;
+	max-height: none !important;
+	border: 0 !important;
+	border-radius: 0 !important;
+	overflow: hidden !important;
+}
+html:fullscreen .lyricly-player canvas { opacity: 0.20; filter: blur(20px) saturate(0.7); }
+html:fullscreen .lyricly-player .amll-lyric-player {
+	width: 52vw !important;
+	margin-left: 43vw !important;
+	padding-top: 7vh;
+	--amll-lp-width: 100% !important;
+	filter: none !important;
+}
+html:fullscreen .lyricly-player .FmKaba_lyricMainLine { font-size: clamp(30px, 3.45vw, 58px); }
+html:fullscreen .lyricly-player .FmKaba_lyricLineWrapper { padding-right: 4vw; }
+.lyricly-fs-backdrop {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	overflow: hidden;
+	pointer-events: none;
+}
+.lyricly-fs-backdrop img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	filter: blur(42px) brightness(0.56) saturate(0.58);
+	transform: scale(1.08);
+}
+.lyricly-fs-backdrop::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background:
+	linear-gradient(90deg, rgba(28, 29, 39, 0.34), rgba(15, 17, 28, 0.66)),
+	linear-gradient(0deg, rgba(5, 6, 12, 0.28), rgba(13, 14, 22, 0.06));
+}
+#lyricly-fullscreen-now {
+	position: absolute;
+	left: clamp(34px, 6.5vw, 112px);
+	top: 50%;
+	transform: translateY(-50%);
+	z-index: 80;
+	width: min(25vw, 340px);
+	color: #fff;
+	font-family: inherit;
+}
+.lyricly-fs-art {
+	display: block;
+	width: 100%;
+	aspect-ratio: 1;
+	object-fit: cover;
+	border-radius: 22px;
+	box-shadow: 0 26px 70px rgba(0,0,0,.42);
+}
+.lyricly-fs-meta { margin-top: 22px; display: grid; gap: 6px; }
+.lyricly-fs-meta strong { font-size: clamp(18px, 1.65vw, 26px); line-height: 1.15; }
+.lyricly-fs-meta span { color: rgba(255,255,255,.62); font-size: clamp(15px, 1.25vw, 20px); }
+.lyricly-fs-progress { margin-top: 18px; }
+.lyricly-fs-progress input {
+	display: block;
+	width: 100%;
+	height: 16px;
+	margin: 0;
+	padding: 0;
+	appearance: none;
+	-webkit-appearance: none;
+	border-radius: 999px;
+	background: linear-gradient(to right, rgba(255,255,255,.97) 0 var(--seek-progress, 0%), rgba(255,255,255,.34) var(--seek-progress, 0%) 100%);
+	cursor: pointer;
+}
+.lyricly-fs-progress input::-webkit-slider-runnable-track {
+	height: 12px;
+	border-radius: 999px;
+	background: transparent;
+}
+.lyricly-fs-progress input::-webkit-slider-thumb {
+	width: 0;
+	height: 0;
+	appearance: none;
+	-webkit-appearance: none;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+}
+.lyricly-fs-progress input::-moz-range-track {
+	height: 12px;
+	border-radius: 999px;
+	background: rgba(255,255,255,.34);
+}
+.lyricly-fs-progress input::-moz-range-progress {
+	height: 12px;
+	border-radius: 999px;
+	background: rgba(255,255,255,.97);
+}
+.lyricly-fs-progress input::-moz-range-thumb {
+	width: 0;
+	height: 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+}
+.lyricly-fs-progress input:focus-visible {
+	outline: 2px solid rgba(255,255,255,.8);
+	outline-offset: 4px;
+}
+.lyricly-fs-times {
+	display: flex;
+	justify-content: space-between;
+	margin-top: 8px;
+	color: rgba(255,255,255,.56);
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: .01em;
+}
+.lyricly-fs-controls {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 18px;
+	margin-top: 18px;
+}
+.lyricly-fs-transport { display: flex; align-items: center; gap: clamp(16px, 2.4vw, 32px); }
+.lyricly-fs-controls button {
+	border: 0;
+	padding: 0;
+	background: transparent;
+	color: rgba(255,255,255,.88);
+	font: inherit;
+	cursor: pointer;
+	transition: transform .16s ease, color .16s ease, background .16s ease;
+}
+.lyricly-fs-controls button:hover { color: #fff; transform: scale(1.1); }
+.lyricly-fs-controls button:focus-visible {
+	outline: 2px solid rgba(255,255,255,.9);
+	outline-offset: 4px;
+}
+.lyricly-fs-controls button svg,
+.lyricly-fs-volume-icon svg {
+	display: block;
+	width: 22px;
+	height: 22px;
+	fill: currentColor;
+}
+.lyricly-fs-controls .lyricly-fs-skip {
+	width: 34px;
+	height: 38px;
+	display: grid;
+	place-items: center;
+	color: rgba(255,255,255,.83);
+}
+.lyricly-fs-controls .lyricly-fs-play {
+	width: 50px;
+	height: 50px;
+	display: grid;
+	place-items: center;
+	border-radius: 50%;
+	background: rgba(255,255,255,.96);
+	color: #17171b;
+	box-shadow: 0 5px 20px rgba(0,0,0,.26);
+}
+.lyricly-fs-controls .lyricly-fs-play:hover {
+	background: #fff;
+	color: #000;
+	transform: scale(1.06);
+}
+.lyricly-fs-controls .lyricly-fs-play svg { width: 23px; height: 23px; }
+.lyricly-fs-volume {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: min(120px, 34%);
+	color: rgba(255,255,255,.85);
+}
+.lyricly-fs-volume-icon svg { width: 19px; height: 19px; }
+.lyricly-fs-volume input {
+	width: 100%;
+	height: 4px;
+	appearance: none;
+	-webkit-appearance: none;
+	border-radius: 999px;
+	background: linear-gradient(to right, #fff 0 var(--volume-progress, 50%), rgba(255,255,255,.34) var(--volume-progress, 50%) 100%);
+	cursor: pointer;
+}
+.lyricly-fs-volume input::-webkit-slider-thumb {
+	width: 11px;
+	height: 11px;
+	appearance: none;
+	-webkit-appearance: none;
+	border: 0;
+	border-radius: 50%;
+	background: #fff;
+}
+.lyricly-fs-volume input::-moz-range-thumb {
+	width: 11px;
+	height: 11px;
+	border: 0;
+	border-radius: 50%;
+	background: #fff;
+}
+@media (max-width: 760px) {
+	#lyricly-fullscreen-now {
+		display: grid;
+		left: 16px;
+		right: 16px;
+		top: auto;
+		bottom: 16px;
+		transform: none;
+		width: auto;
+		grid-template-columns: 64px minmax(0, 1fr);
+		gap: 8px 12px;
+		align-items: center;
+		padding: 12px;
+		border-radius: 18px;
+		background: rgba(8, 8, 13, 0.58);
+		backdrop-filter: blur(22px);
+	}
+	.lyricly-fs-art {
+		grid-column: 1;
+		grid-row: 1 / span 2;
+		width: 64px;
+		border-radius: 12px;
+	}
+	.lyricly-fs-meta { grid-column: 2; margin-top: 0; gap: 3px; }
+	.lyricly-fs-meta strong { font-size: 16px; }
+	.lyricly-fs-meta span { font-size: 13px; }
+	.lyricly-fs-progress,
+	.lyricly-fs-controls { grid-column: 1 / -1; }
+	.lyricly-fs-progress { margin-top: 2px; }
+	.lyricly-fs-controls { margin-top: 0; }
+	html:fullscreen .lyricly-player .amll-lyric-player { width: 86vw !important; margin-left: 7vw !important; }
+}
+/* Spotify's fullscreen button can first enter its cinema shell. Lyricly
+   takes over that canvas itself, so no native nav/sidebar/player UI remains. */
+.lyricly-root.lyricly-fullscreen {
+	position: fixed !important;
+	inset: 0 !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	width: 100vw !important;
+	height: 100vh !important;
+	min-height: 100vh !important;
+	z-index: 2147483646 !important;
+	background: #08080d !important;
+}
+.lyricly-root:fullscreen .lyricly-player,
+.lyricly-root.lyricly-fullscreen .lyricly-player,
+html:fullscreen .lyricly-root .lyricly-player {
+	position: absolute !important;
+	inset: 0 !important;
+	width: 100% !important;
+	height: 100% !important;
+}
+.lyricly-root.lyricly-fullscreen .lyricly-player canvas { opacity: .20; filter: blur(20px) saturate(.7); }
+.lyricly-root.lyricly-fullscreen .lyricly-player .amll-lyric-player {
+	width: 52vw !important;
+	margin-left: 43vw !important;
+	padding-top: 7vh;
+	--amll-lp-width: 100% !important;
+	filter: none !important;
+}
+.lyricly-root.lyricly-fullscreen .lyricly-player .FmKaba_lyricMainLine { font-size: clamp(30px, 3.45vw, 58px); }
+.lyricly-root.lyricly-fullscreen .lyricly-player .FmKaba_lyricLineWrapper { padding-right: 4vw; }
+.lyricly-root.lyricly-fullscreen #lyricly-fullscreen-now { display: block; }
+.lyricly-root:fullscreen #lyricly-fullscreen-now { display: block; }
+.lyricly-root.lyricly-fullscreen:fullscreen,
+.lyricly-root:fullscreen {
+	position: fixed !important;
+	inset: 0 !important;
+	width: 100vw !important;
+	height: 100vh !important;
+	z-index: 2147483647 !important;
+}
+/* If Spotify's cinema shell stays mounted underneath, it is fully occluded
+   by the fixed Lyricly root above; these also remove it from interaction. */
+body.lyricly-fullscreen {
+	overflow: hidden !important;
+	background: #08080d !important;
+}
+body.lyricly-fullscreen .Root__nav-bar,
+body.lyricly-fullscreen .Root__globalNav,
+body.lyricly-fullscreen .Root__top-bar,
+body.lyricly-fullscreen .Root__top-container,
+body.lyricly-fullscreen .Root__left-sidebar,
+body.lyricly-fullscreen .Root__right-sidebar,
+body.lyricly-fullscreen .Root__now-playing-bar,
+body.lyricly-fullscreen .Root__lyrics-cinema,
+body.lyricly-fullscreen .main-topBar-container,
+body.lyricly-fullscreen .main-nowPlayingBar-nowPlayingBar,
+body.lyricly-fullscreen [data-testid="left-sidebar"],
+body.lyricly-fullscreen [data-testid="right-sidebar"],
+body.lyricly-fullscreen [data-testid="top-bar"],
+body.lyricly-fullscreen [data-testid="now-playing-bar"] {
+	display: none !important;
+}
+body:has(.lyricly-root.lyricly-fullscreen) .Root__globalNav,
+body:has(.lyricly-root.lyricly-fullscreen) .Root__nav-bar,
+body:has(.lyricly-root.lyricly-fullscreen) .Root__top-bar,
+body:has(.lyricly-root.lyricly-fullscreen) .Root__top-container,
+body:has(.lyricly-root.lyricly-fullscreen) .Root__left-sidebar,
+body:has(.lyricly-root.lyricly-fullscreen) .Root__right-sidebar,
+body:has(.lyricly-root.lyricly-fullscreen) .Root__now-playing-bar,
+body:has(.lyricly-root.lyricly-fullscreen) [data-testid="left-sidebar"],
+body:has(.lyricly-root.lyricly-fullscreen) [data-testid="right-sidebar"],
+body:has(.lyricly-root.lyricly-fullscreen) [data-testid="top-bar"],
+body:has(.lyricly-root.lyricly-fullscreen) .Root__lyrics-cinema,
+body:has(.lyricly-root.lyricly-fullscreen) .main-nowPlayingBar-nowPlayingBar,
+body:has(.lyricly-root.lyricly-fullscreen) [data-testid="now-playing-bar"] {
+	visibility: hidden !important;
+	pointer-events: none !important;
 }
 /* Static fallback (unsynced/instrumental): plain readable block. */
 .lyricly-static {

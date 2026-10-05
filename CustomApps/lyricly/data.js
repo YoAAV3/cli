@@ -1,11 +1,12 @@
-// Lyricly data layer (framework-free: only Spicetify globals at runtime,
-// fetch, and localStorage). Bundled with app.src.js into index.js — do
+// Lyricly data layer (no UI framework; uses YAML parsing, fetch, and
+// localStorage). Bundled with app.src.js into index.js — do
 // not edit the bundle by hand.
 //
-// Chain: Spotify color-lyrics (track ID, CosmosAsync) -> LRCLIB
-// (track/artist/duration, no key) -> null. In-memory LRU, no bulk.
+// Chain: LRCLIB lyricsfile (real word timings) -> Spotify color-lyrics
+// (line timings) -> null. In-memory LRU, no bulk.
 // Normalized lines: [{text, startMs, endMs, words:[{text,startMs,endMs}],
 // bg?}] with integer ms timings for AMLL.
+import { parse as parseYaml } from "yaml";
 
 const CACHE_LIMIT = 100;
 const cache = new Map(); // track URI -> { lines, source }; in-memory only, no bulk storage
@@ -23,7 +24,7 @@ function cacheSet(k, v) {
 }
 
 // Session tally so you can see how often real word-level timing shows up.
-const sessionStats = { SYLLABLE_SYNCED: 0, LINE_SYNCED: 0, UNSYNCED: 0, NONE: 0 };
+const sessionStats = { WORD_SYNCED: 0, SYLLABLE_SYNCED: 0, LINE_SYNCED: 0, UNSYNCED: 0, NONE: 0 };
 function logSyncType(trackId, provider, syncType, wordTiming, reason) {
 	try {
 		if (sessionStats[syncType] !== undefined) sessionStats[syncType]++;
@@ -52,49 +53,80 @@ function countSyllables(word) {
 	return Math.max(1, n);
 }
 
-function parseLRC(text) {
-	// Returns [{startMs, text}]. Handles [mm:ss.xx], multiple tags/line,
-	// skips metadata tags ([ar:], [ti:], [length:], ...).
-	const out = [];
-	const re = /\[(\d+):(\d+(?:\.\d+)?)\]/g;
-	for (const raw of String(text || "").split("\n")) {
-		const tags = [...raw.matchAll(re)];
-		if (!tags.length) continue;
-		const lyric = raw.replace(re, "").trim();
-		if (!lyric) continue;
-		for (const m of tags) {
-			const frac = m[2].includes(".")
-				? parseFloat("0." + m[2].split(".")[1].padEnd(3, "0").slice(0, 3))
-				: 0;
-			const sec = parseInt(m[1], 10) * 60 + parseInt(m[2], 10) + frac;
-			if (isFinite(sec) && sec >= 0) out.push({ startMs: Math.round(sec * 1000), text: lyric });
-		}
-	}
-	out.sort((a, b) => a.startMs - b.startMs);
-	return out;
+function interpolatePlaybackPosition(anchorProgress, anchorAt, now, isPlaying, durationMs = 0) {
+	const elapsed = isPlaying && anchorAt > 0 ? Math.max(0, now - anchorAt) : 0;
+	const position = Math.max(0, anchorProgress + elapsed);
+	return durationMs > 0 ? Math.min(position, durationMs) : position;
 }
 
 async function fetchSpotifyLyrics(info) {
-	// Primary: color-lyrics straight from Spotify, by track ID, through
+	// Fallback: color-lyrics straight from Spotify, by track ID, through
 	// Spicetify.CosmosAsync (the client's own authenticated channel —
 	// no manual Bearer token needed in here). Request carries the
-	// documented app-platform header. Synced lines win; anything else
-	// (error, empty, unsynced-only) falls through to the LRCLIB backup.
-	if (!info.trackId) return null;
+	// documented app-platform header. Used when LRCLIB lacks real word timing.
+	const trackId = info.trackId || trackIdFromUri(info.uri);
+	if (!trackId) {
+		console.warn("[lyricly] Spotify lyrics skipped: current item has no Spotify track ID.", info.uri);
+		return null;
+	}
 	try {
 		const body = await Spicetify.CosmosAsync.get(
-			`https://spclient.wg.spotify.com/color-lyrics/v2/track/${info.trackId}?format=json&vocalRemoval=false&market=from_token`,
-			null,
-			{ "app-platform": "WebPlayer" }
+			`https://spclient.wg.spotify.com/color-lyrics/v2/track/${trackId}?format=json&vocalRemoval=false&market=from_token`
 		);
 		const lyrics = body && body.lyrics;
-		if (!lyrics || lyrics.syncType !== "LINE_SYNCED" || !Array.isArray(lyrics.lines)) return null;
+		if (!lyrics || !Array.isArray(lyrics.lines)) {
+			console.info("[lyricly] Spotify returned no line-synced lyrics.", {
+				trackId,
+				syncType: lyrics && lyrics.syncType,
+			});
+			return null;
+		}
+		if (lyrics.syncType === "UNSYNCED") {
+			const lines = lyrics.lines
+				.map((line) => String(line.words || "").trim().replace(/\s+/g, " "))
+				.filter(Boolean)
+				.map((text) => ({ startMs: 0, endMs: 0, text, words: [] }));
+			return lines.length ? { syncType: "UNSYNCED", lines } : null;
+		}
+		if (lyrics.syncType === "SYLLABLE_SYNCED") {
+			const lines = lyrics.lines.map((line) => {
+				const syllables = Array.isArray(line.syllables) ? line.syllables : [];
+				const words = syllables.map((syllable) => {
+					const startMs = Number(syllable.startTimeMs);
+					const endMs = Number(syllable.endTimeMs);
+					if (!syllable.text || !Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) return null;
+					return { text: String(syllable.text), startMs, endMs };
+				});
+				if (!words.length || words.some((word) => !word)) return null;
+				const startMs = Number(line.startTimeMs);
+				const endMs = Math.max(Number(line.endTimeMs) || 0, words[words.length - 1].endMs);
+				return {
+					startMs: Number.isFinite(startMs) ? startMs : words[0].startMs,
+					endMs,
+					text: String(line.words || words.map((word) => word.text).join("")).trim(),
+					words,
+				};
+			}).filter(Boolean);
+			return lines.length ? { syncType: "SYLLABLE_SYNCED", lines } : null;
+		}
+		if (lyrics.syncType !== "LINE_SYNCED") {
+			console.info("[lyricly] Spotify lyric sync type is unsupported.", {
+				trackId,
+				syncType: lyrics.syncType,
+			});
+			return null;
+		}
 		const raw = lyrics.lines
 			.map((l) => ({ startMs: Number(l.startTimeMs), text: String(l.words || "").trim().replace(/\s+/g, " ") }))
 			.filter((l) => l.text && isFinite(l.startMs) && l.startMs >= 0);
 		raw.sort((a, b) => a.startMs - b.startMs);
-		return raw.length ? raw : null;
+		if (!raw.length) {
+			console.info("[lyricly] Spotify returned an empty line-synced lyric list.", trackId);
+			return null;
+		}
+		return { syncType: "LINE_SYNCED", lines: raw };
 	} catch (e) {
+		console.warn("[lyricly] Spotify lyrics request failed.", e);
 		return null;
 	}
 }
@@ -107,8 +139,9 @@ function shapeLines(raw, durationMs) {
 	const lines = (raw || []).filter((l) => l && l.text && isFinite(l.startMs) && l.startMs >= 0);
 	return lines.map((l, i) => {
 		const fallback = durationMs > l.startMs ? durationMs : l.startMs + 4000;
-		const end = i + 1 < lines.length && lines[i + 1].startMs > l.startMs ? lines[i + 1].startMs : fallback;
-		const endMs = Math.max(end, l.startMs + 1500);
+		const nextStart = i + 1 < lines.length ? lines[i + 1].startMs : 0;
+		const end = nextStart > l.startMs ? nextStart : fallback;
+		const endMs = Math.max(end, l.startMs + 1);
 		const tokens = l.text.split(/\s+/).filter(Boolean);
 		const weights = tokens.map((w) => Math.max(1, countSyllables(w)));
 		const total = weights.reduce((a, b) => a + b, 0);
@@ -250,189 +283,271 @@ function trackIdFromUri(uri) {
 	return parts.length === 3 && parts[0] === "spotify" && parts[1] === "track" ? parts[2] : "";
 }
 
-function ttmlTime(s) {
-	// m:ss.mmm and h:mm:ss.mmm (both occur in amll-ttml-db files).
-	const m = /^(?:(\d+):)?(\d+):([\d.]+)$/.exec(String(s || "").trim());
-	if (!m) return null;
-	return (m[1] ? parseInt(m[1], 10) * 3600000 : 0) +
-		parseInt(m[2], 10) * 60000 + Math.round(parseFloat(m[3]) * 1000);
-}
-
-function parseTTML(text) {
-	// Minimal TTML -> normalized lines. <p begin end> rows with optional
-	// timed word <span>s. Regex-based (no DOM needed): amll-ttml-db files
-	// are machine-generated and uniform. Returns
-	// [{text, startMs, endMs, words:[{text,startMs,endMs}]|null, bg}].
+function parseSyncedLyrics(text) {
+	if (typeof text !== "string" || !text.trim()) return null;
 	const lines = [];
-	const pRe = /<p\b([^>]*)>([\s\S]*?)<\/p\s*>/gi;
-	let pm;
-	while ((pm = pRe.exec(text || ""))) {
-		const b = ttmlTime((/begin="([^"]*)"/.exec(pm[1]) || [])[1]);
-		const e = ttmlTime((/end="([^"]*)"/.exec(pm[1]) || [])[1]);
-		if (b == null || e == null || e <= b) continue;
-	 const inner = pm[2];
-		const words = [];
-		const sRe = /<span\b([^>]*)>([^<]*)<\/span\s*>/gi;
-		let sm, ok = true;
-		while ((sm = sRe.exec(inner))) {
-			const ws = ttmlTime((/begin="([^"]*)"/.exec(sm[1]) || [])[1]);
-			const we = ttmlTime((/end="([^"]*)"/.exec(sm[1]) || [])[1]);
-			const wt = (sm[2] || "").trim();
-			if (!wt || ws == null || we == null || we <= ws) { ok = false; break; }
-			words.push({ text: wt, startMs: ws, endMs: we });
+	for (const rawLine of text.split(/\r?\n/)) {
+		const matches = [...rawLine.matchAll(/\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g)];
+		if (!matches.length) continue;
+		const lyricText = rawLine.replace(/\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g, "").trim().replace(/\s+/g, " ");
+		if (!lyricText) continue;
+		for (const match of matches) {
+			const fraction = match[3] || "0";
+			const millis = fraction.length === 1 ? Number(fraction) * 100
+				: fraction.length === 2 ? Number(fraction) * 10
+					: Number(fraction.slice(0, 3));
+			const startMs = (Number(match[1]) * 60 + Number(match[2])) * 1000 + millis;
+			if (Number.isSafeInteger(startMs)) lines.push({ startMs, text: lyricText });
 		}
-		if (!ok) continue;
-		const plain = inner.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
-		if (!plain && !words.length) continue;
-		const fullParen = plain.length > 2 && plain.startsWith("(") && plain.endsWith(")");
-		lines.push({
-			text: fullParen ? plain.slice(1, -1).trim() : plain,
-			startMs: b, endMs: e,
-			words: words.length >= 2 ? words : null,
-			bg: fullParen,
-		});
 	}
 	lines.sort((a, b) => a.startMs - b.startMs);
+	return lines.length ? lines : null;
+}
+
+function parseLyricsFile(text) {
+	if (typeof text !== "string" || !text.trim()) return null;
+	let document;
+	try {
+		document = parseYaml(text);
+	} catch (e) {
+		return null;
+	}
+	if (!document || !Array.isArray(document.lines) || !document.lines.length) return null;
+	const numberMs = (value) => {
+		if (value == null || (typeof value === "string" && !value.trim())) return null;
+		const number = typeof value === "number" ? value : Number(value);
+		return Number.isSafeInteger(number) ? number : null;
+	};
+	const normalize = (value) => String(value || "").trim().replace(/\s+/g, " ");
+	const lines = [];
+	for (const entry of document.lines) {
+		if (!entry || typeof entry.text !== "string") return null;
+		if (!entry.text.trim() && (!Array.isArray(entry.words) || !entry.words.length)) continue;
+		if (!Array.isArray(entry.words) || !entry.words.length) return null;
+		const startMs = numberMs(entry.start_ms);
+		const endMs = numberMs(entry.end_ms);
+		if (startMs == null || endMs == null || endMs <= startMs) return null;
+		if (lines.length && startMs < lines[lines.length - 1].startMs) return null;
+		const words = entry.words.map((word) => {
+			if (!word || typeof word.text !== "string" || !word.text) return null;
+			const wordStartMs = numberMs(word.start_ms);
+			if (wordStartMs == null) return null;
+			return { text: word.text, startMs: wordStartMs, endMs: null };
+		});
+		if (words.some((word) => !word)) return null;
+		const line = { text: entry.text, startMs, endMs, words };
+		let assembled = "";
+		for (let i = 0; i < words.length; i++) {
+			const currentWord = words[i];
+			if (currentWord.startMs < startMs || currentWord.startMs >= endMs) return null;
+			if (i > 0 && currentWord.startMs <= words[i - 1].startMs) return null;
+			currentWord.endMs = words[i + 1] ? words[i + 1].startMs : endMs;
+			if (currentWord.endMs <= currentWord.startMs) return null;
+			assembled += currentWord.text;
+		}
+		if (normalize(assembled) !== normalize(entry.text)) return null;
+		lines.push(line);
+	}
 	return lines;
 }
 
-async function fetchAMLL(trackId) {
-	// Word-level community TTML by exact Spotify ID (CC0 database).
-	// 404/absent -> null (chain moves on). Real word timings when the
-	// file carries >=2 timed spans on most lines, else line-level.
-	if (!trackId) return null;
-	const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
-	const timer = setTimeout(() => { try { ctrl && ctrl.abort(); } catch (e) {} }, 8000);
-	try {
-		const res = await fetch(
-			`https://raw.githubusercontent.com/amll-dev/amll-ttml-db/main/spotify-lyrics/${trackId}.ttml`,
-			ctrl ? { signal: ctrl.signal } : undefined
-		);
-		if (!res.ok) return null;
-		const parsed = parseTTML(await res.text());
-		if (!parsed.length) return null;
-		const real = parsed.filter((l) => l.words);
-	 const useReal = real.length >= Math.ceil(parsed.length / 2);
-		const lines = parsed.map((l) => ({
-			text: l.text, startMs: l.startMs, endMs: l.endMs, bg: l.bg,
-			words: useReal && l.words ? l.words : [{ text: l.text, startMs: l.startMs, endMs: l.endMs }],
-		}));
-		return {
-			syncType: useReal ? "SYLLABLE_SYNCED" : "LINE_SYNCED",
-			wordTiming: !useReal ? "interpolated" : parsed.every((l) => l.words) ? "real" : "mixed",
-			lines,
-		};
-	} catch (e) {
-		return null;
-	} finally {
-		try { clearTimeout(timer); } catch (e) {}
-	}
+function normalizeTrackName(value) {
+	return String(value || "").toLowerCase().normalize("NFKD")
+		.replace(/[\u0300-\u036f]/g, "").replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
 async function fetchLRCLIB(info) {
-	const q = (k, v) => `${k}=${encodeURIComponent(v || "")}`;
-	const url = `https://lrclib.net/api/get?${q("track_name", info.title)}&${q("artist_name", info.artist)}&${q("album_name", info.album)}&duration=${info.durationSec}`;
-	const res = await fetch(url, { headers: { "x-user-agent": "lyricly-spicetify-app" } });
-	if (res.status !== 200) return { status: res.status, lines: null };
-	const body = await res.json();
-	if (body.instrumental) return { status: 200, instrumental: true, lines: null };
-	if (!body.syncedLyrics) return { status: 200, lines: null };
-	const lines = parseLRC(body.syncedLyrics);
-	return { status: 200, lines: lines.length ? lines : null };
-}
-
-function peekNextUri() {
-	// Best-effort one-track lookahead. All shapes are probed defensively;
-	// null = prefetch silently skipped (documented, not an error).
+	const params = new URLSearchParams({
+		artist_name: info.artist || "",
+		track_name: info.title || "",
+	});
+	if (info.album) params.set("album_name", info.album);
+	if (info.durationSec > 0) params.set("duration", String(info.durationSec));
+	const controller = typeof AbortController === "undefined" ? null : new AbortController();
+	const timer = setTimeout(() => {
+		try { controller && controller.abort(); } catch (e) {}
+	}, 2500);
 	try {
-		const P = Spicetify.Player;
-		if (P && typeof P.getNextTrack === "function") {
-			const t = P.getNextTrack();
-			if (t && t.uri) return t.uri;
+		const res = await fetch(`https://lrclib.net/api/search?${params}`, {
+			headers: { "x-user-agent": "lyricly-spicetify-app" },
+			...(controller ? { signal: controller.signal } : {}),
+		});
+		if (!res.ok) {
+			console.warn("[lyricly] LRCLIB search failed with HTTP " + res.status + ".");
+			return { status: res.status, lines: null };
 		}
-		const Q = Spicetify.Queue;
-		const cand = Q && (Q.nextTracks || (Q.queue && Q.queue.next) || Q.next);
-		if (Array.isArray(cand) && cand[0] && cand[0].uri) return cand[0].uri;
-		const d = P && P.data && P.data.item && P.data.item.next;
-		if (d && d.uri) return d.uri;
-	} catch (e) {}
-	return null;
-}
+		const body = await res.json();
+		const expectedTitle = normalizeTrackName(info.title);
+		const expectedArtist = normalizeTrackName(info.artist);
+		const candidates = (Array.isArray(body) ? body : body ? [body] : [])
+			.filter((entry) => entry && typeof entry === "object")
+			.map((entry, index) => {
+				const title = normalizeTrackName(entry.trackName || entry.track_name);
+				const artist = normalizeTrackName(entry.artistName || entry.artist_name);
+				const album = normalizeTrackName(entry.albumName || entry.album_name);
+				const duration = entry.duration == null || entry.duration === "" ? NaN : Number(entry.duration);
+				const difference = Number.isFinite(duration) && info.durationSec
+					? Math.abs(duration - info.durationSec)
+					: 0;
+				const matchesTitle = title && expectedTitle && (title === expectedTitle || title.includes(expectedTitle) || expectedTitle.includes(title));
+				const matchesArtist = artist && expectedArtist && (artist === expectedArtist || artist.includes(expectedArtist) || expectedArtist.includes(artist));
+				const matchesAlbum = album && normalizeTrackName(info.album) && album === normalizeTrackName(info.album);
+				const plausibleDuration = !info.durationSec || !Number.isFinite(duration) ||
+					difference <= Math.max(12, info.durationSec * 0.06);
+				return {
+					entry,
+					index,
+					matchesTitle,
+					matchesArtist,
+					plausibleDuration,
+					syncedLines: parseSyncedLyrics(entry.syncedLyrics),
+					plainLines: typeof entry.plainLyrics === "string"
+						? entry.plainLyrics.split(/\r?\n/).map((text) => text.trim()).filter(Boolean)
+						: null,
+					score: (title === expectedTitle ? 30 : matchesTitle ? 8 : 0) +
+						(artist === expectedArtist ? 30 : matchesArtist ? 8 : 0) +
+						(matchesAlbum ? 30 : 0) +
+						(!Number.isFinite(duration) || !info.durationSec ? 0 :
+							difference <= 2 ? 20 : difference <= 5 ? 14 : difference <= 12 ? 6 : 0),
+				};
+			})
+			.filter((candidate) => candidate.matchesTitle && candidate.matchesArtist && candidate.plausibleDuration)
+			.sort((a, b) => b.score - a.score || a.index - b.index);
 
-function trackInfoForUri(uri) {
-	// Prefetch resolves the provider chain for a not-yet-playing URI
-	// using current track fields as the LRCLIB query (Spotify provider
-	// uses the peeked track ID, which IS exact).
-	const cur = trackInfo();
-	const parts = String(uri || "").split(":");
-	return { ...cur, uri: uri || "", trackId: parts.length === 3 ? parts[2] : "" };
+		let instrumental = false;
+		let syncedLines = null;
+		let plainLines = null;
+		for (const { entry, syncedLines: candidateSyncedLines, plainLines: candidatePlainLines } of candidates) {
+			if (!syncedLines && candidateSyncedLines) syncedLines = candidateSyncedLines;
+			if (!plainLines && candidatePlainLines && candidatePlainLines.length) plainLines = candidatePlainLines;
+			if (entry.instrumental) {
+				instrumental = true;
+				continue;
+			}
+			const lines = parseLyricsFile(entry.lyricsfile);
+			if (lines && lines.length) return { status: 200, lines, wordTiming: "real" };
+		}
+		if (!syncedLines && !plainLines && !instrumental) {
+			console.info("[lyricly] LRCLIB matched no usable word-timed, synced, or plain lyrics.", {
+				title: info.title,
+				artist: info.artist,
+				matches: candidates.length,
+			});
+		}
+		if (instrumental && !syncedLines && !plainLines) return { status: 200, instrumental: true, lines: null };
+		return { status: 200, lines: null, syncedLines, plainLines };
+	} finally {
+		clearTimeout(timer);
+	}
 }
 
 async function resolveLyrics(info) {
-	// Chain: Spotify color-lyrics (exact ID, official line-level) ->
-	// amll-ttml-db (exact ID, real word timings when lucky) -> LRCLIB
-	// (fuzzy) -> null. Word-level results outrank interpolated lines:
-	// an amll SYLLABLE pack beats the Spotify line pack.
+	// Prefer verified, native LRCLIB word timing. If it is missing or
+	// malformed, fall back to Spotify's authenticated line-synced endpoint.
 	// Returns { provider, syncType, wordTiming, lines, trackId } or null.
-	let spot = null;
-	try {
-		const sp = await fetchSpotifyLyrics(info);
-		if (sp) {
-			const lines = markBgLines(shapeLines(sp, info.durationMs));
-			if (lines.length) spot = { provider: "spotify", syncType: "LINE_SYNCED", wordTiming: "interpolated", lines, trackId: info.trackId };
-		}
-	} catch (e) {}
-	try {
-		const am = await fetchAMLL(info.trackId);
-		// Any real (syllable-level) timing outranks interpolated lines.
-		if (am && am.syncType === "SYLLABLE_SYNCED" && am.lines.length) {
-			const pack = { ...am, provider: "amll", trackId: info.trackId };
-			logSyncType(pack.trackId, pack.provider, pack.syncType, pack.wordTiming, spot ? "spotify line-only" : null);
-			return pack;
-		}
-		if (am && !spot) {
-			// amll line-level only and Spotify missed: still better than fuzzy.
-			const pack = { ...am, provider: "amll", trackId: info.trackId };
-			logSyncType(pack.trackId, pack.provider, pack.syncType, pack.wordTiming, "spotify miss");
-			return pack;
-		}
-	} catch (e) {}
-	if (spot) {
-		logSyncType(spot.trackId, spot.provider, spot.syncType, spot.wordTiming, null);
-		return spot;
-	}
+	let instrumental = false;
+	let lrclibSyncedLines = null;
+	let lrclibPlainLines = null;
 	try {
 		const lr = await fetchLRCLIB(info);
-		if (lr && !lr.instrumental && lr.lines) {
-			const lines = markBgLines(shapeLines(lr.lines, info.durationMs));
+		if (lr && lr.instrumental) {
+			instrumental = true;
+		}
+		if (lr && lr.syncedLines) lrclibSyncedLines = lr.syncedLines;
+		if (lr && lr.plainLines) lrclibPlainLines = lr.plainLines;
+		if (lr && lr.lines && lr.lines.length) {
+			logSyncType(info.trackId || info.uri, "lrclib", "WORD_SYNCED", "real", null);
+			return {
+				provider: "lrclib",
+				syncType: "WORD_SYNCED",
+				wordTiming: "real",
+				lines: lr.lines,
+				trackId: info.trackId || info.uri,
+			};
+		}
+	} catch (e) {
+		console.warn("[lyricly] LRCLIB request failed; falling back to Spotify lyrics.", e);
+	}
+
+	try {
+		const spotify = await fetchSpotifyLyrics(info);
+		if (spotify && spotify.syncType === "UNSYNCED") {
+			const pack = {
+				provider: "spotify",
+				syncType: "UNSYNCED",
+				wordTiming: "none",
+				lines: spotify.lines,
+				trackId: info.trackId || trackIdFromUri(info.uri),
+			};
+			logSyncType(pack.trackId, pack.provider, pack.syncType, pack.wordTiming, "Spotify supplied unsynced lyrics");
+			return pack;
+		}
+		if (spotify && spotify.syncType === "SYLLABLE_SYNCED" && spotify.lines.length) {
+			const pack = {
+				provider: "spotify",
+				syncType: "SYLLABLE_SYNCED",
+				wordTiming: "real",
+				lines: spotify.lines,
+				trackId: info.trackId || trackIdFromUri(info.uri),
+			};
+			logSyncType(pack.trackId, pack.provider, pack.syncType, "syllable", "Spotify supplied syllable timestamps");
+			return pack;
+		}
+		if (spotify && spotify.lines) {
+			const lines = markBgLines(shapeLines(spotify.lines, info.durationMs));
 			if (lines.length) {
-				const pack = { provider: "lrclib", syncType: "LINE_SYNCED", wordTiming: "interpolated", lines, trackId: info.trackId || info.uri };
-				logSyncType(pack.trackId, pack.provider, pack.syncType, pack.wordTiming, "spotify miss");
+				const pack = {
+					provider: "spotify",
+					syncType: "LINE_SYNCED",
+					wordTiming: "interpolated",
+					lines,
+					trackId: info.trackId || trackIdFromUri(info.uri),
+				};
+				logSyncType(pack.trackId, pack.provider, pack.syncType, pack.wordTiming, "LRCLIB word timing unavailable");
 				return pack;
 			}
 		}
-		if (lr && lr.instrumental) {
-			logSyncType(info.trackId || info.uri, "none", "UNSYNCED", "none", "instrumental");
-			return { provider: "none", syncType: "UNSYNCED", wordTiming: "none", lines: [], trackId: info.trackId || info.uri, instrumental: true };
+	} catch (e) {
+		console.warn("[lyricly] Spotify lyrics fallback failed.", e);
+	}
+
+	if (lrclibSyncedLines) {
+		const lines = markBgLines(shapeLines(lrclibSyncedLines, info.durationMs));
+		if (lines.length) {
+			const pack = {
+				provider: "lrclib",
+				syncType: "LINE_SYNCED",
+				wordTiming: "interpolated",
+				lines,
+				trackId: info.trackId || trackIdFromUri(info.uri),
+			};
+			logSyncType(pack.trackId, pack.provider, pack.syncType, pack.wordTiming, "LRCLIB word timing unavailable; using synced lyrics after Spotify");
+			return pack;
 		}
-	} catch (e) {}
+	}
+	if (lrclibPlainLines) {
+		const pack = {
+			provider: "lrclib",
+			syncType: "UNSYNCED",
+			wordTiming: "none",
+			lines: lrclibPlainLines.map((text) => ({ startMs: 0, endMs: 0, text, words: [] })),
+			trackId: info.trackId || trackIdFromUri(info.uri),
+		};
+		logSyncType(pack.trackId, pack.provider, pack.syncType, pack.wordTiming, "using LRCLIB plain lyrics after Spotify");
+		return pack;
+	}
+
+	if (instrumental) {
+		logSyncType(info.trackId || info.uri, "lrclib", "UNSYNCED", "none", "instrumental; Spotify had no synced lyrics");
+		return { provider: "lrclib", syncType: "UNSYNCED", wordTiming: "none", lines: [], trackId: info.trackId || info.uri, instrumental: true };
+	}
 	logSyncType(info.trackId || info.uri, "none", "UNSYNCED", "none", "no lyrics");
 	return null;
 }
 
-async function prefetchNext(resolveFn) {
-	const uri = peekNextUri();
-	if (!uri || cacheGet(uri)) return;
-	try {
-		const pack = await (resolveFn || resolveLyrics)(trackInfoForUri(uri));
-		if (pack && pack.lines && pack.lines.length) cacheSet(uri, pack);
-	} catch (e) {}
-}
-
 export {
 	CACHE_LIMIT, cacheGet, cacheSet, sessionStats, logSyncType,
-	countSyllables, parseLRC, fetchSpotifyLyrics, shapeLines,
-	looksBg, splitWordsTimed, markBgLines, ttmlTime, parseTTML, fetchAMLL,
-	trackInfo, trackIdFromUri, fetchLRCLIB,
-	peekNextUri, trackInfoForUri, resolveLyrics, prefetchNext,
+	countSyllables, interpolatePlaybackPosition, fetchSpotifyLyrics, shapeLines,
+	looksBg, splitWordsTimed, markBgLines, trackInfo, trackIdFromUri,
+	parseSyncedLyrics, parseLyricsFile, fetchLRCLIB, resolveLyrics,
 };

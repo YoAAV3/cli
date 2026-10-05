@@ -28,8 +28,13 @@ function toAMLLWord(w, lineStart, lineEnd) {
 // render glued together with no spaces.
 function spaceWords(words) {
 	return (words || []).map((w, i) => {
-		const t = String(w.word).replace(/^ +/, "");
-		return i === 0 ? { ...w, word: t } : { ...w, word: " " + t };
+		const text = String(w.word);
+		if (i === 0) return { ...w, word: text.replace(/^\s+/, "") };
+		const previous = String(words[i - 1].word);
+		return {
+			...w,
+			word: /\s$/.test(previous) || /^\s/.test(text) ? text : " " + text,
+		};
 	});
 }
 
