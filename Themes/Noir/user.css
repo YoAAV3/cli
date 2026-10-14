@@ -493,7 +493,6 @@ main .e-10860-card.Card:nth-child(5) { animation-delay: 0.14s; }
 
 /* ---- Home, final layout pass: shared rhythm and quiet red surfaces. ---- */
 main:has([data-testid="shortcut-background"]) {
-	--lyricly-home-margin: 28px;
 	position: relative;
 	isolation: isolate;
 	background: linear-gradient(180deg, rgba(112, 10, 29, 0.54) 0, rgba(54, 7, 17, 0.24) 19rem, #000 37rem) !important;
