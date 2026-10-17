@@ -1,0 +1,950 @@
+:root {
+  --bg-rotation-degree: 258deg;
+  /* --sltoaster-bottom-padding: 104px; */
+}
+
+:root:has(#SpicyLyricsPage.Fullscreen) {
+  --sltoaster-bottom-padding: 32px;
+}
+
+.main-nowPlayingView-contextItemInfo::before,
+aside.NowPlayingView.spicy-dynamic-bg-in-this
+  [data-testid="NPV_Panel_OpenDiv"]
+  div:has(> [data-testid="track-visual-enhancement"]) ~ div::before {
+  display: none;
+}
+
+#SpicyLyricsPage {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  height: 100%;
+  container-type: size;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  font-weight: 700;
+  user-select: none;
+  -webkit-user-drag: none;
+  opacity: 1;
+  transition:
+    left 0.5s cubic-bezier(0.91, 0.04, 0.94, 0.98),
+    transform 0.6s cubic-bezier(0.78, 0, 0.22, 1);
+  will-change: transform;
+}
+
+#SpicyLyricsPage.frame_F_Exit {
+  transform: translateY(100%);
+}
+
+#SpicyLyricsPage.UseSpicyFont,
+#SpicyLyricsPage.UseSpicyFont *,
+.SpicyLyricsFontPixel,
+.SpicyLyricsFontPixel * {
+  font-family: SpicyLyrics, "Noto Sans Georgian", "VazirmatnRegular", sans-serif !important;
+}
+
+:is(.Root__main-view, :where(#main-view)):has(#SpicyLyricsPage) .main-view-container__scroll-node-child,
+:is(.Root__main-view, :where(#main-view)):has(#SpicyLyricsPage) .main-view-container__scroll-node-child-spacer,
+:is(.Root__main-view, :where(#main-view)):has(#SpicyLyricsPage) .main-view-container__scroll-node-child,
+:is(.Root__main-view, :where(#main-view)):has(#SpicyLyricsPage) .main-view-container__scroll-node-child-spacer {
+  display: none;
+}
+
+#SpicyLyricsPage .ViewControls {
+  container-type: size;
+  display: flex;
+  gap: 6px;
+  height: 5cqh;
+  justify-content: center;
+  align-items: center;
+  opacity: 1;
+  transition: opacity 0.3s !important;
+  z-index: 101;
+  --ViewControlSize: 110cqh;
+}
+
+
+
+#SpicyLyricsPage:not(.Fullscreen) .ViewControls {
+  position: absolute;
+  width: 100cqw;
+  opacity: 0;
+}
+
+#SpicyLyricsPage.ViewControlsPosition_Bottom:not(.Fullscreen) .ViewControls {
+  bottom: 24px;
+}
+
+#SpicyLyricsPage.ViewControlsPosition_Top:not(.Fullscreen) .ViewControls {
+  top: 24px;
+}
+
+.Root:not(.global-nav) :is(.Root__main-view, :where(#main-view)) #SpicyLyricsPage.ViewControlsPosition_Top:not(.Fullscreen) .ViewControls {
+  bottom: 36px;
+  top: unset;
+}
+
+
+
+/* :root:has(.SpicyBG.BackgroundLayer)
+  #SpicyLyricsPage:not(.Fullscreen)
+  .ViewControls,
+:root:has(.lucid-bg-wrapper) #SpicyLyricsPage:not(.Fullscreen) .ViewControls {
+  bottom: 115px !important;
+}
+
+body.player-floating:has(.glassify-bg) #SpicyLyricsPage:not(.Fullscreen) .ViewControls {
+  bottom: 96px !important;
+}
+
+:root:has(.lucid-bg) #SpicyLyricsPage:not(.Fullscreen) .ViewControls {
+  bottom: 80px !important;
+} */
+
+#SpicyLyricsPage:not(.Fullscreen):hover .ViewControls {
+  opacity: 0.7;
+}
+
+#SpicyLyricsPage:not(.Fullscreen) .ViewControls:hover {
+  opacity: 1 !important;
+}
+
+#SpicyLyricsPage .ViewControls .ViewControl {
+  --ViewControlHeight: var(--ViewControlSize, 100cqh);
+  aspect-ratio: 1;
+  background: var(--material-regular-bg);
+  -webkit-backdrop-filter: var(--material-regular-blur);
+  backdrop-filter: var(--material-regular-blur);
+  border: 0;
+  border-radius: 100rem;
+  display: flex;
+  height: var(--ViewControlHeight);
+  width: var(--ViewControlHeight);
+  -webkit-app-region: no-drag;
+  align-items: center;
+  color: var(--color-text-primary);
+  justify-content: center;
+  text-align: center;
+  -webkit-box-align: center;
+  -webkit-box-pack: center;
+  box-shadow:
+    0 10px 24px -8px rgba(8, 10, 18, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.36),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.18);
+  transition: scale 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+}
+
+#SpicyLyricsPage .ViewControls .ViewControl:hover {
+  scale: 1.015;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 14px 32px -8px rgba(8, 10, 18, 0.5),
+    0 0 22px -4px rgba(255, 255, 255, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.48),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.24);
+}
+
+#SpicyLyricsPage .ViewControls .ViewControl:active {
+  scale: 0.94;
+}
+
+#SpicyLyricsPage .ViewControls:has(.ViewControl:hover) > .ViewControl:not(:hover) {
+  opacity: 0.78;
+}
+
+#SpicyLyricsPage .ViewControls .ViewControl svg:not(.NoFill) {
+  fill: currentColor;
+}
+
+#SpicyLyricsPage .ViewControls .ViewControl svg.NoFill {
+  fill: none !important;
+}
+
+/* Icon parts (Icons.ts) follow page state, so the icon always shows the layout the page has. */
+#SpicyLyricsPage .ViewControls .SL_IconPart {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform var(--dur-base, 0.25s) var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+
+#SpicyLyricsPage.NowBarSide__Right .ViewControls #NowBarToggle .SL_IconCover {
+  transform: translateX(9px);
+}
+
+#SpicyLyricsPage.NowBarSide__Right .ViewControls #NowBarToggle .SL_IconLyrics {
+  transform: translateX(-12.5px);
+}
+
+#SpicyLyricsPage.NowBarSide__Right .ViewControls #NowBarSideToggle .SL_IconCover {
+  transform: translateX(7px);
+}
+
+#SpicyLyricsPage.NowBarSide__Right .ViewControls .SL_IconSwapArrow {
+  transform: translateX(-8px) rotate(180deg);
+}
+
+/* Hover leans each part toward what the button will do: corners out, the gear a tooth on. */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  #SpicyLyricsPage .ViewControls .ViewControl:hover .SL_NudgeTL { translate: -1px -1px; }
+  #SpicyLyricsPage .ViewControls .ViewControl:hover .SL_NudgeTR { translate: 1px -1px; }
+  #SpicyLyricsPage .ViewControls .ViewControl:hover .SL_NudgeBR { translate: 1px 1px; }
+  #SpicyLyricsPage .ViewControls .ViewControl:hover .SL_NudgeBL { translate: -1px 1px; }
+  #SpicyLyricsPage .ViewControls .ViewControl:hover .SL_IconGear { rotate: 45deg; }
+}
+
+#SpicyLyricsPage .ViewControls .SL_NudgeTL,
+#SpicyLyricsPage .ViewControls .SL_NudgeTR,
+#SpicyLyricsPage .ViewControls .SL_NudgeBR,
+#SpicyLyricsPage .ViewControls .SL_NudgeBL,
+#SpicyLyricsPage .ViewControls .SL_IconGear {
+  transition:
+    transform var(--dur-base, 0.25s) var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+    translate 0.2s var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+    rotate 0.3s var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #SpicyLyricsPage .ViewControls .SL_IconPart {
+    transition: none;
+  }
+}
+
+/* #SpicyLyricsPage:not(.Fullscreen, .NowBarSide__Right) .ViewControls:hover {
+  opacity: 1 !important;
+  left: var(--ControlsHoverOffset) !important;
+  scale: var(--ControlsHoverScale) !important;
+}
+
+#SpicyLyricsPage:not(.Fullscreen, .NowBarSide__Right):hover .ViewControls {
+  opacity: .6;
+  left: var(--PageHoverOffset);
+  scale: var(--PageHoverScale);
+}
+
+#SpicyLyricsPage:not(.Fullscreen):is(.NowBarSide__Right):is(.NowBarStatus__Open) .ViewControls:hover {
+  opacity: 1 !important;
+  right: var(--ControlsHoverOffset) !important;
+  scale: var(--ControlsHoverScale) !important;
+}
+
+#SpicyLyricsPage:not(.Fullscreen):is(.NowBarSide__Right):is(.NowBarStatus__Open):hover .ViewControls {
+  opacity: .6;
+  right: var(--PageHoverOffset);
+  scale: var(--PageHoverScale);
+} */
+
+#SpicyLyricsPage .ViewControls button {
+  cursor: pointer;
+}
+
+/* Spotify 1.3.x: Spicetify no longer maps the sidebar or NPV section classes, so
+   these rules also reach the NPV through aside.NowPlayingView, the panel's test id
+   and child position, which hold on both builds. The panel's first child is the
+   cover widget; every later child except our card is a section. */
+body:not(.SpicyLyrics_StaticBackground)
+  .Root__right-sidebar:has(.main-nowPlayingView-section, canvas),
+body:not(.SpicyLyrics_StaticBackground)
+  aside.NowPlayingView {
+  --background-tint: color-mix(in srgb, rgb(var(--spice-rgb-selected-row)) 7%, transparent);
+  --spice-card: var(--background-tint);
+  --background-tinted-base: var(--background-tint);
+}
+
+body:not(.SpicyLyrics_StaticBackground)
+  .Root__right-sidebar:has(.spicy-dynamic-bg):has(.main-nowPlayingView-section, canvas)
+  .main-nowPlayingView-content,
+/* A :has() ancestor with a bare `> div` subject made Blink restyle every div in
+   the document on any DOM change. The aside carries .spicy-dynamic-bg-in-this
+   exactly while it holds the background, and the section implies the old
+   :has(.main-nowPlayingView-section) check; the doubled class keeps specificity. */
+body:not(.SpicyLyrics_StaticBackground)
+  .Root__right-sidebar
+  .spicy-dynamic-bg-in-this.spicy-dynamic-bg-in-this
+  .main-nowPlayingView-section > div,
+body:not(.SpicyLyrics_StaticBackground)
+  aside.NowPlayingView.spicy-dynamic-bg-in-this.spicy-dynamic-bg-in-this
+  [data-testid="NPV_Panel_OpenDiv"] > div:not(:first-child, #SpicyLyricsNPVCard) > div {
+  background: transparent;
+}
+
+body:not(.SpicyLyrics_StaticBackground)
+  .Root__right-sidebar:has(.spicy-dynamic-bg):has(.main-nowPlayingView-section, canvas)
+  .main-nowPlayingView-contextItemInfo:before {
+  display: none;
+}
+
+body:not(.SpicyLyrics_StaticBackground)
+  .Root__right-sidebar:has(.spicy-dynamic-bg):has(.main-nowPlayingView-section, canvas)
+  .spicy-dynamic-bg
+  div[data-overlayscrollbars-viewport] {
+  background: transparent;
+}
+
+body:not(.SpicyLyrics_StaticBackground)
+  .Root__right-sidebar:has(.spicy-dynamic-bg):has(.main-nowPlayingView-section, canvas)
+  .spicy-dynamic-bg
+  .main-trackInfo-artists {
+  filter: brightness(1.15);
+  opacity: 0.75;
+}
+
+/* Zero-specificity gate so a theme restyling the cover (a round vinyl, its own
+   shadow) wins. No opacity: it made everything a theme draws on the cover,
+   pseudo-elements included, see-through. */
+:where(body:not(.SpicyLyrics_StaticBackground)
+  .Root__right-sidebar:has(.spicy-dynamic-bg):has(.main-nowPlayingView-section, canvas))
+  .main-nowPlayingView-coverArt,
+:where(body:not(.SpicyLyrics_StaticBackground)
+  aside.NowPlayingView.spicy-dynamic-bg-in-this
+  [data-testid="track-visual-enhancement"])
+  [data-testid="context-link"] > div {
+  box-shadow: 0 9px 20px 0 rgba(0, 0, 0, 0.271);
+}
+
+body:not(.SpicyLyrics_StaticBackground)
+  .Root__right-sidebar:has(.spicy-dynamic-bg):has(.main-nowPlayingView-section, canvas)
+  .main-nowPlayingView-section.QR9JmVmX9LYwo62NRtew
+  .CvxzmyND_aGd2RR8ZoSr,
+body:not(.SpicyLyrics_StaticBackground)
+  .Root__right-sidebar:has(.spicy-dynamic-bg):has(.main-nowPlayingView-section, canvas)
+  .Uw4tcZdmh7s4BMdgCCuu,
+body:not(.SpicyLyrics_StaticBackground)
+  .Root__right-sidebar:has(.spicy-dynamic-bg):has(.main-nowPlayingView-section, canvas)
+  .main-nowPlayingView-section:is(.main-nowPlayingView-aboutArtist, .main-nowPlayingView-aboutArtistV2) :is(.jHqD4CkJSTwpZihD, .main-nowPlayingView-aboutArtistV2TextContent),
+body:not(.SpicyLyrics_StaticBackground)
+  .Root__right-sidebar:has(.spicy-dynamic-bg):has(.main-nowPlayingView-section, canvas)
+  .aN6RjOsDo5DSOGDMRF2G,
+body:not(.SpicyLyrics_StaticBackground)
+  .Root__right-sidebar:has(.spicy-dynamic-bg):has(.main-nowPlayingView-section, canvas)
+  .dYRZ9rexJXs7DswS,
+/* About the artist's text block (1.2.98's .jHqD4CkJSTwpZihD): the one div that
+   holds the artist link directly. */
+body:not(.SpicyLyrics_StaticBackground)
+  aside.NowPlayingView.spicy-dynamic-bg-in-this
+  [data-testid="NPV_Panel_OpenDiv"] > div:not(:first-child, #SpicyLyricsNPVCard) div:has(> a[href^="/artist/"]) {
+    background-color: transparent !important;
+}
+
+body:not(.SpicyLyrics_StaticBackground)
+  .Root__right-sidebar:has(.spicy-dynamic-bg):has(.main-nowPlayingView-section, canvas)
+  .main-nowPlayingView-section:not(:has(.search-searchCategory-carousel)):not(:has(button[type="button"])),
+body:not(.SpicyLyrics_StaticBackground)
+  .Root__right-sidebar:has(.spicy-dynamic-bg):has(.main-nowPlayingView-section, canvas)
+  .main-nowPlayingView-aboutArtist,
+body:not(.SpicyLyrics_StaticBackground)
+  aside.NowPlayingView.spicy-dynamic-bg-in-this
+  /* Every section but the carousel ("Related music videos"), About the artist
+     included, as the classed rules above do on 1.2.98. */
+  [data-testid="NPV_Panel_OpenDiv"] > div:not(:first-child, #SpicyLyricsNPVCard, .dYRZ9rexJXs7DswS):not(:has([data-carousel-item])) {
+  background-color: var(--background-tinted-base) !important;
+  backdrop-filter: blur(6px);
+}
+
+body:not(.SpicyLyrics_StaticBackground)
+  .Root__right-sidebar:has(.spicy-dynamic-bg):has(.main-nowPlayingView-section, canvas)
+  .main-nowPlayingView-section.main-nowPlayingView-aboutArtistV2 .main-nowPlayingView-aboutArtistV2TextContent {
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+
+body:not(.SpicyLyrics_StaticBackground)
+  .Root__right-sidebar:has(.spicy-dynamic-bg):has(.main-nowPlayingView-section, canvas)
+  .main-nowPlayingView-section:has(button[type="button"]),
+body:not(.SpicyLyrics_StaticBackground)
+  aside.NowPlayingView.spicy-dynamic-bg-in-this
+  [data-testid="NPV_Panel_OpenDiv"] > div:not(:first-child, #SpicyLyricsNPVCard):has(button[type="button"]) {
+  background-color: transparent;
+}
+
+body:not(.SpicyLyrics_StaticBackground)
+  .Root__right-sidebar:has(.spicy-dynamic-bg):has(.main-nowPlayingView-section, canvas)
+  button[type="button"],
+body:not(.SpicyLyrics_StaticBackground)
+  aside.NowPlayingView.spicy-dynamic-bg-in-this
+  button[type="button"] {
+  /* background-color: var(--background-tinted-base); */
+  background-color: transparent;
+  /* color: hsla(0, 0%, 100%, 0.8); */
+}
+
+body:not(.SpicyLyrics_StaticBackground)
+  .Root__right-sidebar:has(.spicy-dynamic-bg):has(.main-nowPlayingView-section, canvas)
+  button[type="button"]
+  .Button-sm-buttonSecondary-isUsingKeyboard-useBrowserDefaultFocusStyle,
+.Root__right-sidebar:has(.main-nowPlayingView-section, canvas)
+  button[type="button"]
+  .Button-sm-buttonSecondary-useBrowserDefaultFocusStyle {
+  border: 1px solid hsla(0, 0%, 100%, 0.5);
+}
+
+/* Spotify's newer NPV layout (enableNowPlayingViewTraits). Its classes are hashed
+   differently on every build, but the panel root carries [data-npv-root] and
+   paints through variables: itself with --background-base, every section card
+   with --section-background-base. Inside the scroll content, the cards are the
+   children of the info block's children (the sections list and the "Next in
+   queue" wrapper); nested cards such as "About the artist" reuse the same
+   variable, so it's cleared below the cards to keep the tint from stacking. */
+body:not(.SpicyLyrics_StaticBackground)
+  aside.spicy-dynamic-bg-in-this > [data-npv-root] {
+  --background-tint: color-mix(in srgb, rgb(var(--spice-rgb-selected-row)) 7%, transparent);
+  --spice-card: var(--background-tint);
+  --background-tinted-base: var(--background-tint);
+  --section-background-base: var(--background-tint);
+  background-color: transparent;
+}
+
+body:not(.SpicyLyrics_StaticBackground)
+  aside.spicy-dynamic-bg-in-this > [data-npv-root]
+  [data-overlayscrollbars-viewport] > * > * > * > * > * {
+  --section-background-base: transparent;
+}
+
+/* Tour date badges paint --background-base, the old panel colour. */
+body:not(.SpicyLyrics_StaticBackground)
+  aside.spicy-dynamic-bg-in-this > [data-npv-root] a time:has(> p) {
+  background: rgba(255, 255, 255, 0.078);
+}
+
+/* The header fills in with --background-base as the panel scrolls (a scroll-driven
+   animation on --npv-scroll). Replaced with the blur the legacy layout's header
+   gets once scrolled, on the same timeline. */
+body:not(.SpicyLyrics_StaticBackground)
+  aside.spicy-dynamic-bg-in-this > [data-npv-root] > :first-child:not([data-scroll-background-disabled]) {
+  animation: SpicyLyrics_NPVHeaderBlur 1ms linear both;
+  animation-timeline: --npv-scroll;
+  animation-range: 0px 32px;
+}
+
+@keyframes SpicyLyrics_NPVHeaderBlur {
+  from {
+    backdrop-filter: blur(0);
+  }
+  to {
+    backdrop-filter: blur(6px);
+  }
+}
+
+/* The Canvas's scrims darken to the old panel colour, solid at the bottom, which
+   cut a hard edge across the dynamic background. The video sits in the first
+   child of the surface's wrapper and the scrims in the one after it; the video
+   already fades out on its own (spicy-dynamic-bg.css). */
+body:not(.SpicyLyrics_StaticBackground)
+  aside.spicy-dynamic-bg-in-this [data-canvas-surface] > * > :not(:first-child) {
+  display: none;
+}
+
+/* Mirrors Spotify's .main-nowPlayingBar-lyricsButton rule, which our buttons no longer carry. */
+.SpicyLyrics_PlaybarButton {
+  flex-shrink: 0;
+  padding: 0;
+}
+
+/* Spotify's own tooltip rule. Spicetify's Tippy still renders .main-contextMenu-tippy,
+   which Spotify 1.3.x no longer styles; on older builds this repeats the same values. */
+.SpicyLyrics_Tooltip > .main-contextMenu-tippy {
+  --generic-tooltip-background-color: var(--spice-card);
+  color: var(--spice-text);
+  background-color: var(--generic-tooltip-background-color);
+  text-overflow: ellipsis;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  border-radius: 4px;
+  -webkit-box-orient: vertical;
+  max-width: 50ch;
+  padding: 4px 8px;
+  display: -webkit-box;
+  overflow: hidden;
+  box-shadow: 0 16px 24px #0000004d, 0 6px 8px #0003;
+  font-size: 14px !important;
+}
+
+#SpicyLyricsPageSvg {
+  fill: currentColor;
+  transform: translateY(2px);
+}
+
+.Root:not(.global-nav) #SpicyLyricsPageSvg {
+  transform: translateY(0);
+}
+
+#SpicyLyrics_PopupLyricsButton svg {
+  fill: var(--encore-icon-fill, currentColor);
+  height: var(--encore-icon-height, var(--encore-graphic-size-decorative-base));
+  width: var(--encore-icon-width, var(--encore-graphic-size-decorative-base));
+  transform: translateY(2px);
+}
+
+/* Our Popup Lyrics button takes the place of Spotify's Miniplayer button. A rule
+   rather than a one-off inline style, so a Miniplayer button Spotify re-renders
+   or adds back later is hidden as well. */
+body.SpicyLyrics_PopupLyricsEnabled
+  :is([data-testid="now-playing-bar"], .Root__now-playing-bar)
+  button[data-testid="pip-toggle-button"] {
+  display: none !important;
+}
+
+button:has(#SpicyLyricsPageSvg)::after {
+  transform: translateX(-50%) !important;
+}
+
+button:has(#SpicyLyricsPageSvg):not(.main-genericButton-buttonActive, .main-genericButton-buttonActiveDot, .OJsKOflU3SmUHnQ5_QKE)::after {
+  content: unset;
+}
+
+/* "Page Not Visible" fix */
+:is(.Root__main-view, :where(#main-view)):has(#SpicyLyricsPage),
+:is(.Root__main-view, :where(#main-view)):has(#SpicyLyricsPage) .KL8t9WB65UfUEPuTFAhO,
+:is(.Root__main-view, :where(#main-view)):has(#SpicyLyricsPage) .main-content-view,
+:is(.Root__main-view, :where(#main-view)):has(#SpicyLyricsPage) .main-view-container,
+:is(.Root__main-view, :where(#main-view)):has(#SpicyLyricsPage) .main-view-container__scroll-node,
+:is(.Root__main-view, :where(#main-view)):has(#SpicyLyricsPage) .main-view-container .div[data-overlayscrollbars-viewport] {
+  height: 100% !important;
+}
+
+body:not(:has(.Root__main-view-overlay #SpicyLyricsPage:is(.Fullscreen)))
+  #SpicyLyrics_FullscreenButton {
+  scale: 1.25;
+}
+
+#SpicyLyrics_FullscreenButton {
+  color: rgba(var(--spice-rgb-selected-row), 0.7) !important;
+}
+
+#SpicyLyrics_FullscreenButton svg {
+  fill: currentColor;
+}
+
+body:not(:has(.Root__main-view-overlay .BeautifulLyricsPage:is(.Fullscreen)))
+  #BeautifulLyricsFullscreenButton {
+  scale: 0.85 !important;
+  order: 1000 !important;
+  opacity: 0.65 !important;
+}
+
+#SpicyLyricsPage .MediaImageContainer,
+#SpicyLyricsPage .MediaContent {
+  user-select: none;
+}
+
+#SpicyLyricsPage .ViewControls svg {
+  aspect-ratio: 1;
+  height: calc(var(--ViewControlSize) * 0.4);
+  width: auto;
+}
+/* 
+#SpicyLyricsPage.Fullscreen .ViewControls svg {
+  height: calc(var(--ViewControlSize)* .4);
+} */
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+  z-index: 999;
+}
+
+
+/* .QdB2YtfEq0ks5O4QbtwX .WRGTOibB8qNEkgPNtMxq:has(#SpicyLyricsPage) *:not(#SpicyLyricsPage),
+.QdB2YtfEq0ks5O4QbtwX:has(#SpicyLyricsPage) .DJcMUKFwkFECf5ksmSfU {
+  display: none !important;
+} */
+
+#SpicyLyricsPage:not(.Lyrics_RomanizationAvailable) .ViewControls #RomanizationToggle,
+#SpicyLyricsPage:not(.SpicyRenderer) .ViewControls #RomanizationToggle {
+  display: none !important;
+}
+
+#SpicyLyricsPage.CompactifyEnabledCompactMode .ViewControls .ViewControl#CompactModeToggle {
+  display: none !important;
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+  .sl-modal-container:has(.update-card-wrapper) {
+    width: min(28rem, 92vw);
+  }
+
+  .update-card-wrapper {
+    display: flex;
+    gap: var(--space-3);
+    flex-direction: column;
+
+    .uc-title {
+      font-size: 1.2rem !important;
+      font-weight: var(--w-semibold);
+      color: var(--color-text-primary);
+      line-height: 1.3;
+      letter-spacing: -0.015em;
+      margin: 0;
+    }
+
+    .uc-subtitle {
+      font-size: var(--text-body-size) !important;
+      color: var(--color-text-secondary);
+      margin: 0;
+      line-height: 1.45;
+    }
+
+    .uc-divider {
+      height: 1px;
+      background: var(--hairline);
+      margin: var(--space-1) 0;
+    }
+
+    button {
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 9px 18px;
+      font-size: var(--text-body-size) !important;
+      font-weight: var(--w-semibold);
+      cursor: pointer;
+      transition:
+        background-color 0.15s var(--ease-standard),
+        box-shadow 0.15s var(--ease-standard),
+        color 0.15s var(--ease-standard),
+        transform 0.12s ease;
+      letter-spacing: 0.01em;
+
+      &:active {
+        transform: scale(0.97);
+      }
+    }
+
+    .btn-update {
+      background-color: var(--accent);
+      color: var(--accent-on-fill);
+
+      &:hover {
+        background-color: var(--accent-hover);
+      }
+    }
+
+    /* Data migration variant — centered icon-led message. */
+    &.migration-card {
+      align-items: center;
+      text-align: center;
+
+      .udc-icon-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: var(--accent-tint-bg);
+        box-shadow: inset 0 0 0 1px var(--hairline);
+        margin-bottom: 2px;
+        flex-shrink: 0;
+
+        .udc-migrate-svg {
+          width: 24px;
+          height: 24px;
+          color: var(--color-text-primary);
+        }
+      }
+
+      .udc-desc {
+        color: var(--color-text-secondary);
+        max-width: 22rem;
+        line-height: 1.55;
+      }
+
+      button {
+        width: 100%;
+      }
+    }
+
+    a {
+      color: var(--color-text-primary);
+      font-weight: var(--w-semibold);
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+}
+
+
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+  .dev-tools-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    .dt-section-label {
+      font-size: var(--text-footnote-size) !important;
+      font-weight: var(--w-semibold);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-text-tertiary);
+      padding: 0 2px;
+      margin-bottom: 4px;
+    }
+
+    .dt-setting {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+      padding: var(--space-3) var(--space-4);
+      border-radius: var(--radius-md);
+      transition: background var(--dur-fast) var(--ease-standard);
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .dt-setting-info {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+      }
+
+      .dt-setting-name {
+        font-size: var(--text-headline-size) !important;
+        font-weight: var(--w-semibold);
+        color: var(--color-text-primary);
+        white-space: nowrap;
+      }
+
+      .dt-setting-desc {
+        font-size: var(--text-caption-size) !important;
+        font-weight: var(--w-regular);
+        color: var(--color-text-tertiary);
+      }
+    }
+
+    .dt-btn {
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 8px 16px;
+      font-size: var(--text-caption-size) !important;
+      font-weight: var(--w-semibold);
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      letter-spacing: 0.01em;
+      min-height: var(--tap-min);
+      transition: background-color 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
+      width: 132px;
+
+      &:active {
+        transform: scale(0.97);
+      }
+
+      &.dt-btn-primary {
+        background-color: var(--accent);
+        color: var(--accent-on-fill);
+
+        &:hover {
+          background-color: var(--accent-hover);
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+        }
+      }
+
+      &.dt-btn-danger {
+        background-color: rgba(255, 255, 255, 0.06);
+        -webkit-backdrop-filter: blur(8px) saturate(1.4);
+        backdrop-filter: blur(8px) saturate(1.4);
+        color: var(--color-text-primary);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.18),
+          inset 0 0 0 1px var(--hairline-strong),
+          inset 0 -1px 0 rgba(255, 255, 255, 0.14);
+        border: 0;
+
+        &:hover {
+          background-color: rgba(255, 255, 255, 0.11);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.24),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+            inset 0 -1px 0 rgba(255, 255, 255, 0.16);
+        }
+      }
+    }
+  }
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal,
+sl-generic-modal.SpicyLyricsModal .sl-modal .sl-modal-container {
+  border-radius: var(--radius-lg);
+}
+
+.sl-modal-main-section:has(.scroll-x-hidden) {
+  overflow-x: hidden;
+}
+
+
+.Root.global-nav :is(.Root__main-view, :where(#main-view)):has(#SpicyLyricsPage) > header,
+.Root.global-nav :is(.Root__main-view, :where(#main-view)):has(#SpicyLyricsPage) > .main-topBar-container {
+  display: none !important;
+}
+
+.sl-modal:has(.hidden-modal-header-style) .sl-modal-header {
+  /* border-bottom: none !important;
+  padding: 24px 46px 0px !important;
+  margin-bottom: -40px !important;
+  position: relative;
+  z-index: 104; */
+
+  display: none;
+}
+
+/* .sl-modal:has(.slm.hidden-modal-header-style) .sl-modal-content {
+  position: relative;
+  z-index: 106;
+}
+
+.sl-modal:has(.slm.hidden-modal-header-style) .sl-modal-header h1 {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 0px !important;
+  line-height: 0 !important;
+} */
+
+/* Modal enter/exit animation.
+
+   Why this is structured the way it is:
+   An ancestor with `opacity < 1` flattens its subtree into an off-screen
+   composited surface; any descendant `backdrop-filter` then has nothing to
+   sample and the blur only "snaps in" once opacity hits 1. So entry/exit
+   cannot ride on an opacity transition above the glass element.
+
+   Ownership split — every animated property lives on an element that no
+   other CSS file targets with `transition`, so feature-level rules
+   (settings-panel transitions container `width`, ttml-profile overrides
+   container `overflow`, etc.) cannot accidentally clobber the animation:
+     - overlay         : `background-color` — overlay tint fades.
+     - .sl-modal::before : `backdrop-filter` / `background-color` /
+                           `box-shadow` — the glass material itself fades,
+                           and it has no opacity-animated ancestors.
+     - .sl-modal-container > * : `opacity` on EVERY direct child — header,
+                                 main-section, and any future structural
+                                 child (footer, action bar, etc.) fade
+                                 together without per-element wiring.
+     - .sl-modal       : `scale` — does not flatten the subtree.            */
+
+/* Compound `.sl-modal-overlay.sl-modal-overlay-animated` to outrank the
+   polyfill rule on `.sl-modal-overlay` (loaded later, sets bg to the active
+   tint). Both selectors match the same element. */
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay.sl-modal-overlay-animated {
+  background-color: rgba(0, 0, 0, 0);
+  transition: background-color 0.22s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay.sl-modal-overlay-animated.Active {
+  background-color: rgba(0, 0, 0, 0.45);
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay-animated .sl-modal::before {
+  transition:
+    background-color 0.22s cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 0.22s cubic-bezier(0.23, 1, 0.32, 1),
+    -webkit-backdrop-filter 0.22s cubic-bezier(0.23, 1, 0.32, 1),
+    backdrop-filter 0.22s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay-animated:not(.Active) .sl-modal::before {
+  background-color: rgba(22, 22, 22, 0);
+  -webkit-backdrop-filter: blur(0px) saturate(1);
+  backdrop-filter: blur(0px) saturate(1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0),
+    inset 0 0 0 1px rgba(255, 255, 255, 0),
+    0 0 0 0 rgba(0, 0, 0, 0),
+    0 0 0 0 rgba(0, 0, 0, 0);
+  transform: scale(0.96);
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay-animated .sl-modal-container > *,
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay-animated .sl-modal-container-large > * {
+  transition: opacity 0.22s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay-animated:not(.Active) .sl-modal-container > *,
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay-animated:not(.Active) .sl-modal-container-large > * {
+  opacity: 0;
+}
+
+/* Modal scale: 0.96 → 1 on enter (never from scale(0) — looks like it
+   appears from nowhere). Custom ease-out curve gives instant initial
+   movement, no overshoot.
+
+   The transform deliberately does NOT live on `.sl-modal`. Per the CSS
+   Filter Effects spec, an element with `transform` becomes a backdrop
+   root, which would prevent the `.sl-modal::before` backdrop-filter from
+   sampling anything below the modal — killing the visible blur. Instead,
+   transform is split across the two visible layers (::before glass plate
+   and the container holding the content). Both share the same layout box
+   and scale from the same center, so the modal still scales as a unit. */
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay-animated .sl-modal::before,
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay-animated .sl-modal-container,
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay-animated .sl-modal-container-large {
+  transition: transform 0.22s cubic-bezier(0.23, 1, 0.32, 1);
+  will-change: transform;
+  transform: scale(0.96);
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay-animated.Active .sl-modal::before,
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay-animated.Active .sl-modal-container,
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay-animated.Active .sl-modal-container-large {
+  transform: scale(1);
+}
+
+#SpicyLyricsPage .ContentBox.LyricsHidden .ViewControls #NowBarSideToggle {
+  display: none !important;
+}
+
+#SpicyLyricsPage.episode-content-type .ContentBox .NowBar .Heart {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.SL_spinAnimation {
+  animation: SL_spin 0.8s linear infinite;
+}
+
+@keyframes SL_spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+aside.NowPlayingView,
+.Root__right-sidebar aside {
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+
+.main-genericButton-button.main-genericButton-buttonActiveDot:after {
+  content: "";
+  background-color: var(--spice-button);
+  border-radius: 50%;
+  width: 4px;
+  height: 4px;
+  display: block;
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translate(-50%);
+  inline-size: 4px !important;
+}
+
+/* "Remove Spotify's lyrics button" setting. Our own button carries #SpicyLyricsPageSvg. */
+body.SpicyLyrics_RemoveSpotifyLyricsButton .main-nowPlayingBar-lyricsButton[data-testid="lyrics-button"]:not(:has(#SpicyLyricsPageSvg)),
+body.SpicyLyrics_RemoveSpotifyLyricsButton [data-testid="now-playing-bar"] [data-testid="lyrics-button"]:not(:has(#SpicyLyricsPageSvg)),
+body.SpicyLyrics_RemoveSpotifyLyricsButton .main-nowPlayingBar-extraControls > [data-testid="lyrics-button"]:not(:has(#SpicyLyricsPageSvg)) {
+  display: none !important;
+}

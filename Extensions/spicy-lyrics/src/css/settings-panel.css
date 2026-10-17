@@ -1,0 +1,1306 @@
+/* ── Settings Panel — reads chrome tokens from the modal scope ────── */
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+  /* Search field. Shared with the Lyrics Manager's search bar, so anything
+     specific to the settings sidebar lives under .sl-sp-sidebar below. */
+  .sl-sp-search-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    background: var(--accent-tint-bg);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+    border-radius: var(--radius-sm);
+    padding: 0 10px;
+    height: var(--tap-min);
+    transition:
+      box-shadow var(--dur-fast) var(--ease-standard),
+      background var(--dur-fast) var(--ease-standard);
+
+    &:hover {
+      background: var(--accent-tint-bg-hover);
+    }
+
+    &:focus-within {
+      background: var(--accent-tint-bg-hover);
+      box-shadow: inset 0 0 0 1px var(--hairline-strong);
+    }
+
+    .sl-sp-search-icon {
+      color: var(--color-text-tertiary);
+      flex-shrink: 0;
+    }
+
+    .sl-sp-search {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+      color: var(--color-text-primary);
+      font-size: var(--text-body-size) !important;
+      font-weight: var(--w-regular);
+      min-width: 0;
+
+      &::placeholder {
+        color: var(--color-text-secondary);
+      }
+
+      /* The clear button below replaces the native one. */
+      &::-webkit-search-cancel-button {
+        -webkit-appearance: none;
+        display: none;
+      }
+    }
+
+    .sl-sp-search-clear {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      color: var(--color-text-tertiary);
+      flex-shrink: 0;
+      transition: color var(--dur-fast) var(--ease-standard);
+
+      &:hover {
+        color: var(--color-text-secondary);
+      }
+    }
+  }
+
+  /* ── Frame ──────────────────────────────────────────────────────────────
+     A fixed-size window, so switching tabs never resizes it. The panel draws
+     its own header, so the modal's is hidden and its main section hands the
+     full height to the panel; only the right-hand pane scrolls. */
+  .slmodal-settingsPanel > div {
+    width: min(940px, 94vw);
+    height: min(700px, 88vh);
+  }
+
+  .slmodal-settingsPanel .sl-modal-header {
+    display: none;
+  }
+
+  .slmodal-settingsPanel .sl-modal-main-section {
+    flex: 1;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .slmodal-settingsPanel .sl-modal-content,
+  .slmodal-settingsPanel .sl-sp-page {
+    height: 100%;
+  }
+
+  .sl-sp {
+    display: grid;
+    grid-template-columns: 216px minmax(0, 1fr);
+    height: 100%;
+  }
+
+  /* ── Sidebar ────────────────────────────────────────────────────────────
+     A heavier, flat tint than the pane: structure, not a surface to read.
+     No backdrop-filter — the main section is transformed, so a blur in here
+     would have nothing to sample. Only the corners it shares with the modal
+     are rounded. */
+  .sl-sp-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-height: 0;
+    padding: 22px 12px var(--space-4);
+    overflow-y: auto;
+    background: color-mix(in oklab, var(--sl-sp-field-deep, #000) 42%, transparent);
+    box-shadow: inset -1px 0 0 var(--hairline);
+    border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+
+    .sl-sp-search-wrap {
+      flex: none;
+      height: 34px;
+    }
+  }
+
+  .sl-sp-brand {
+    padding: 0 10px;
+  }
+
+  .sl-sp-title {
+    margin: 0;
+    font-size: 1.5rem !important;
+    font-weight: var(--w-bold);
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    color: var(--color-text-primary);
+  }
+
+  .sl-sp-tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .sl-sp-tabs-divider {
+    height: 1px;
+    margin: var(--space-2) 10px;
+    background: var(--hairline);
+  }
+
+  /* Selection swaps instantly — tabs are pressed too often for the
+     highlight to travel. The press itself still answers at once. */
+  .sl-sp-tab {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 34px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--color-text-secondary);
+    font-size: var(--text-body-size) !important;
+    font-weight: var(--w-medium);
+    text-align: left;
+    cursor: pointer;
+    outline: none;
+    transition:
+      background-color var(--dur-fast) ease,
+      color var(--dur-fast) ease,
+      opacity var(--dur-fast) ease,
+      transform 0.12s var(--ease-out);
+
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
+        background: var(--accent-tint-bg);
+        color: var(--color-text-primary);
+      }
+    }
+
+    &:active {
+      transform: scale(0.98);
+    }
+
+    &:focus-visible {
+      box-shadow: inset 0 0 0 1.5px var(--hairline-strong);
+    }
+
+    &[data-active] {
+      background: var(--accent-tint-bg-hover);
+      color: var(--color-text-primary);
+    }
+
+    /* While searching: a section with no hits steps back, but stays clickable. */
+    &[data-empty] {
+      opacity: 0.45;
+    }
+  }
+
+  .sl-sp-tab-icon {
+    display: flex;
+    flex-shrink: 0;
+  }
+
+  .sl-sp-tab-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sl-sp-tab-count {
+    flex-shrink: 0;
+    min-width: 20px;
+    padding: 1px 6px;
+    border-radius: var(--radius-pill);
+    background: var(--accent-tint-bg-hover);
+    color: var(--color-text-primary);
+    font-size: var(--text-footnote-size) !important;
+    font-weight: var(--w-semibold);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+  }
+
+  .sl-sp-tab-dot {
+    flex-shrink: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--color-status-warning);
+  }
+
+  /* ── Pane ─────────────────────────────────────────────────────────────── */
+  .sl-sp-pane {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  /* No divider at rest; a hairline appears once content scrolls beneath. */
+  .sl-sp-pane-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 34px;
+    padding: 22px 18px 14px 32px;
+    box-shadow: inset 0 -1px 0 transparent;
+    transition: box-shadow var(--dur-fast) ease;
+
+    &[data-scrolled] {
+      box-shadow: inset 0 -1px 0 var(--hairline);
+    }
+  }
+
+  .sl-sp-pane-title {
+    margin: 0;
+    font-size: 1.5rem !important;
+    font-weight: var(--w-bold);
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    color: var(--color-text-primary);
+  }
+
+  .sl-sp-pane-count {
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption-size) !important;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sl-sp-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    margin-left: auto;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--accent-tint-bg);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition:
+      background-color var(--dur-fast) ease,
+      color var(--dur-fast) ease,
+      transform 0.12s var(--ease-out),
+      opacity 0.18s var(--ease-out);
+
+    &:hover {
+      background: var(--accent-tint-bg-hover);
+      color: var(--color-text-primary);
+    }
+
+    &:active {
+      transform: scale(0.94);
+    }
+  }
+
+  .sl-sp-pane-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--space-2) 32px 32px;
+  }
+
+  /* Only a pointer-driven tab change fades; see `instant` in index.tsx. */
+  .sl-sp-pane-body:not([data-instant]) {
+    animation: sl-sp-pane-in 0.14s var(--ease-out) both;
+  }
+
+  .sl-sp-intro {
+    max-width: 62ch;
+    margin: 0 0 var(--space-5);
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption-size) !important;
+    line-height: 1.45;
+  }
+
+  /* ── Groups ───────────────────────────────────────────────────────────
+     Inset grouped list: a quiet caption, then one card whose rows are split
+     by hairlines that start at the text, not the card's edge. */
+  .sl-sp-group + .sl-sp-group {
+    margin-top: var(--space-6);
+  }
+
+  .sl-sp-group-title {
+    margin: 0 0 var(--space-2) 4px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption-size) !important;
+    font-weight: var(--w-semibold);
+    letter-spacing: 0.01em;
+  }
+
+  .sl-sp-group-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    transition: color var(--dur-fast) ease;
+
+    svg {
+      transition: transform 0.18s var(--ease-out);
+    }
+
+    &:hover {
+      color: var(--color-text-primary);
+
+      svg {
+        transform: translateX(2px);
+      }
+    }
+  }
+
+  .sl-sp-card {
+    border-radius: var(--radius-md);
+    background: var(--accent-tint-bg);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+  }
+
+  .sl-sp-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: 13px var(--space-4);
+
+    & + .sl-sp-row::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: var(--space-4);
+      right: 0;
+      height: 1px;
+      background: var(--hairline);
+    }
+
+    .sl-sp-label-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .sl-sp-label {
+      color: var(--color-text-primary);
+      font-size: var(--text-body-size) !important;
+      font-weight: var(--w-medium);
+      line-height: 1.3;
+    }
+
+    .sl-sp-description {
+      max-width: 62ch;
+      color: var(--color-text-secondary);
+      font-size: var(--text-caption-size) !important;
+      font-weight: var(--w-regular);
+      line-height: 1.4;
+    }
+
+    /* Why a row is off, and what turns it on. Stays at full strength while the
+       rest of the row recedes. */
+    .sl-sp-reason {
+      color: var(--color-text-primary);
+      font-size: var(--text-footnote-size) !important;
+      font-weight: var(--w-medium);
+      line-height: 1.35;
+      opacity: 0.8;
+    }
+
+    .sl-sp-control {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    &.sl-sp-row--disabled {
+      .sl-sp-label,
+      .sl-sp-description,
+      .sl-sp-control {
+        opacity: 0.45;
+      }
+
+      .sl-sp-control {
+        pointer-events: none;
+      }
+    }
+  }
+
+  /* Stacked row — the control drops onto its own full-width line beneath the
+     label, for wide controls (sliders) that need the room. */
+  .sl-sp-row--stacked {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+
+    .sl-sp-control {
+      width: 100%;
+      flex-shrink: 1;
+    }
+  }
+
+  .sl-sp-mark {
+    padding: 0 1px;
+    border-radius: 3px;
+    background: color-mix(in oklab, var(--color-text-primary) 26%, transparent);
+    color: inherit;
+  }
+
+  .sl-sp-empty {
+    padding: 56px var(--space-4);
+    text-align: center;
+  }
+
+  .sl-sp-empty-title {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: var(--text-body-size) !important;
+    font-weight: var(--w-semibold);
+  }
+
+  .sl-sp-empty-hint {
+    margin: var(--space-1) 0 0;
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption-size) !important;
+  }
+
+  /* Toggle — iOS-style state contrast through *luminance opposition*: the
+     track and knob always sit on opposite ends of the brightness scale, so
+     they can never read as the same color. OFF is a dark recessed groove
+     with a bright cream knob; ON is a bright track with a pure-white knob
+     ringed by a dark hairline so it still pops against the bright track.
+     The shift in BOTH track and knob brightness is what signals state in
+     a monochrome system. */
+  .sl-sp-toggle {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    width: 42px;
+    height: 24px;
+
+    input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .sl-sp-toggle-track {
+      width: 42px;
+      height: 24px;
+      /* OFF: dark recessed groove. Reads as a slot cut into the modal,
+         not as another light surface fighting with the knob. */
+      background: rgba(0, 0, 0, 0.42);
+      box-shadow:
+        inset 0 1px 2px rgba(0, 0, 0, 0.45),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      transition:
+        background 0.22s cubic-bezier(0.23, 1, 0.32, 1),
+        box-shadow 0.22s cubic-bezier(0.23, 1, 0.32, 1);
+      position: relative;
+
+      &::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        /* OFF knob: clearly brighter than the dark groove. */
+        background: rgba(245, 245, 245, 0.78);
+        box-shadow:
+          0 2px 5px rgba(0, 0, 0, 0.5),
+          0 0 0 0.5px rgba(0, 0, 0, 0.28);
+        transition:
+          transform 0.22s cubic-bezier(0.23, 1, 0.32, 1),
+          background 0.22s cubic-bezier(0.23, 1, 0.32, 1),
+          box-shadow 0.22s cubic-bezier(0.23, 1, 0.32, 1);
+      }
+    }
+
+    &:hover .sl-sp-toggle-track {
+      background: rgba(0, 0, 0, 0.5);
+
+      &::after {
+        background: rgba(255, 255, 255, 0.9);
+      }
+    }
+
+    input:checked + .sl-sp-toggle-track {
+      /* ON: lit track. Brighter than the off groove but deliberately not
+         pure white — that's reserved for the knob. */
+      background: rgba(255, 255, 255, 0.42);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.3),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+
+      &::after {
+        transform: translateX(18px);
+        /* ON knob: pure white, ringed by a 1px dark hairline so it
+           remains visibly separate from the bright track. The hairline
+           is what guarantees the knob is never lost on white. */
+        background: #ffffff;
+        box-shadow:
+          0 2px 6px rgba(0, 0, 0, 0.5),
+          0 0 0 1px rgba(0, 0, 0, 0.18);
+      }
+    }
+
+    &:hover input:checked + .sl-sp-toggle-track {
+      background: rgba(255, 255, 255, 0.52);
+    }
+
+    /* Locked (a forced experiment): the state stays fully legible — only the
+       control recedes, never the label — and hover no longer promises a
+       change it can't make. The Forced on/off badge carries the why. */
+    &.sl-sp-toggle--locked {
+      cursor: not-allowed;
+      opacity: 0.55;
+
+      &:hover .sl-sp-toggle-track {
+        background: rgba(0, 0, 0, 0.42);
+
+        &::after {
+          background: rgba(245, 245, 245, 0.78);
+        }
+      }
+
+      &:hover input:checked + .sl-sp-toggle-track {
+        background: rgba(255, 255, 255, 0.42);
+
+        &::after {
+          background: #ffffff;
+        }
+      }
+    }
+  }
+
+  /* "Forced on/off" tag beside an experiment's label. A quiet chip, not an
+     alert: the row is informational, nothing is wrong. */
+  .sl-sp-forced-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: var(--space-2);
+    padding: 2px 7px 2px 6px;
+    border-radius: 999px;
+    vertical-align: 1px;
+    background: var(--accent-tint-bg);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption-size) !important;
+    font-weight: var(--w-semibold);
+    letter-spacing: 0.01em;
+    line-height: 1.3;
+    white-space: nowrap;
+    cursor: default;
+
+    svg {
+      flex-shrink: 0;
+    }
+  }
+
+  /* Experiments panel, while an experimentsState fetch is in flight
+     (data-syncing). Same treatment as a forced toggle: the control recedes,
+     the label stays. */
+  .sl-sp-sync-gate {
+    display: inline-flex;
+
+    .sl-sp-toggle {
+      transition: opacity var(--dur-fast) var(--ease-out);
+    }
+
+    &[data-syncing] .sl-sp-toggle--busy {
+      cursor: progress;
+      opacity: 0.55;
+      transition-duration: 0.2s;
+
+      &:hover .sl-sp-toggle-track {
+        background: rgba(0, 0, 0, 0.42);
+
+        &::after {
+          background: rgba(245, 245, 245, 0.78);
+        }
+      }
+
+      &:hover input:checked + .sl-sp-toggle-track {
+        background: rgba(255, 255, 255, 0.42);
+
+        &::after {
+          background: #ffffff;
+        }
+      }
+    }
+
+    /* Already receded on its own; don't stack a second dim on top. */
+    &[data-syncing] .sl-sp-toggle--locked {
+      opacity: 0.55;
+    }
+  }
+
+  /* "Checking for changes" — beside the Experiments title, the same quiet chip
+     as the Forced badge. Grows out of its left edge, from the title it
+     annotates. */
+  .sl-sp-sync-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 9px 3px 8px;
+    border-radius: 999px;
+    background: var(--accent-tint-bg);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption-size) !important;
+    font-weight: var(--w-semibold);
+    letter-spacing: 0.01em;
+    line-height: 1.3;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(0.96);
+    transform-origin: left center;
+    transition:
+      opacity var(--dur-fast) var(--ease-out),
+      transform var(--dur-fast) var(--ease-out);
+
+    &[data-visible] {
+      opacity: 1;
+      transform: none;
+      transition-duration: 0.2s;
+    }
+  }
+
+  .sl-sp-sync-spinner {
+    flex-shrink: 0;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 1.5px solid currentColor;
+    border-top-color: transparent;
+    animation: sl-sp-sync-spin 0.7s linear infinite;
+    /* Paused while the pill is hidden (ExperimentsPanel.tsx sets data-spinning). */
+    animation-play-state: paused;
+  }
+
+  .sl-sp-sync-status[data-spinning] .sl-sp-sync-spinner {
+    animation-play-state: running;
+  }
+
+
+  /* Select — flat tinted surface, no inner blur */
+  .sl-sp-select {
+    background: var(--accent-tint-bg);
+    color: var(--color-text-primary);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+    border: 0;
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    font-size: var(--text-caption-size) !important;
+    font-weight: var(--w-medium);
+    cursor: pointer;
+    outline: none;
+    transition:
+      background var(--dur-fast) var(--ease-standard),
+      box-shadow var(--dur-fast) var(--ease-standard);
+
+    &:hover {
+      background: var(--accent-tint-bg-hover);
+      box-shadow: inset 0 0 0 1px var(--hairline-strong);
+    }
+
+    option {
+      background: #ffffff;
+      color: rgba(0, 0, 0, 0.92);
+    }
+  }
+
+  /* Bipolar position slider — a recessed groove (matching the toggle's dark
+     slot) with a fill that grows out from the centre tick toward the thumb,
+     plus a value readout and an inline Reset. */
+  .sl-sp-slider {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    width: 100%;
+  }
+
+  .sl-sp-slider-track-wrap {
+    position: relative;
+    height: 20px;
+    display: flex;
+    align-items: center;
+  }
+
+  .sl-sp-slider-track,
+  .sl-sp-slider-fill {
+    position: absolute;
+    top: 50%;
+    height: 4px;
+    transform: translateY(-50%);
+    border-radius: var(--radius-pill);
+    pointer-events: none;
+  }
+
+  .sl-sp-slider-track {
+    left: 0;
+    right: 0;
+    /* Light groove so the unfilled track reads against the dark modal
+       material instead of sinking into it. */
+    background: rgba(255, 255, 255, 0.18);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+
+  .sl-sp-slider-fill {
+    background: var(--accent);
+  }
+
+  .sl-sp-slider-center {
+    position: absolute;
+    top: 50%;
+    width: 2px;
+    height: 12px;
+    transform: translate(-50%, -50%);
+    border-radius: 1px;
+    background: var(--hairline-strong);
+    pointer-events: none;
+  }
+
+  .sl-sp-slider-input {
+    position: relative;
+    width: 100%;
+    height: 20px;
+    margin: 0;
+    background: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    outline: none;
+    cursor: pointer;
+    z-index: 1;
+
+    &::-webkit-slider-runnable-track {
+      height: 4px;
+      background: transparent;
+    }
+
+    &::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      margin-top: -6px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow:
+        0 2px 6px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(0, 0, 0, 0.18);
+      cursor: grab;
+      transition: transform 0.12s ease;
+    }
+
+    &:hover::-webkit-slider-thumb {
+      transform: scale(1.1);
+    }
+
+    &:active::-webkit-slider-thumb {
+      transform: scale(0.92);
+      cursor: grabbing;
+    }
+
+    &:focus-visible::-webkit-slider-thumb {
+      box-shadow:
+        0 2px 6px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(0, 0, 0, 0.18),
+        0 0 0 4px var(--accent-tint-bg-hover);
+    }
+  }
+
+  .sl-sp-slider-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    min-height: 18px;
+  }
+
+  .sl-sp-slider-value {
+    font-size: var(--text-caption-size) !important;
+    font-weight: var(--w-semibold);
+    color: var(--color-text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sl-sp-slider-reset {
+    border: none;
+    background: none;
+    padding: 0;
+    font-size: var(--text-caption-size) !important;
+    font-weight: var(--w-medium);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: color var(--dur-fast) var(--ease-standard);
+
+    &:hover {
+      color: var(--color-text-primary);
+    }
+  }
+
+  .sl-sp-slider--disabled {
+    opacity: 0.45;
+    pointer-events: none;
+  }
+
+
+  /* Inline action button (Reset, Clear, etc.) — flat tinted surface */
+  .sl-sp-btn {
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 7px 14px;
+    font-size: var(--text-caption-size) !important;
+    font-weight: var(--w-semibold);
+    cursor: pointer;
+    letter-spacing: 0.01em;
+    background: var(--accent-tint-bg);
+    color: var(--color-text-primary);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+    transition:
+      background var(--dur-fast) var(--ease-standard),
+      box-shadow var(--dur-fast) var(--ease-standard),
+      transform 0.12s ease;
+
+    &:hover {
+      background: var(--accent-tint-bg-hover);
+      box-shadow: inset 0 0 0 1px var(--hairline-strong);
+    }
+
+    &:active {
+      transform: scale(0.97);
+    }
+  }
+
+
+  /* ── About ────────────────────────────────────────────────────────────
+     The build's identity first, then the ways out. */
+  .sl-sp-about {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .sl-sp-about-hero {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-6);
+    border-radius: var(--radius-md);
+    background: var(--accent-tint-bg);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+  }
+
+  .sl-sp-about-wordmark {
+    color: var(--color-text-primary);
+    font-size: 2.25rem !important;
+    font-weight: var(--w-bold);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+  }
+
+  .sl-sp-about-status-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 24px;
+    font-size: var(--text-body-size) !important;
+  }
+
+  .sl-sp-about-version {
+    color: var(--color-text-primary);
+    font-weight: var(--w-medium);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sl-sp-about-sep {
+    color: var(--color-text-quaternary);
+  }
+
+  .sl-sp-about-status {
+    font-weight: var(--w-semibold);
+  }
+
+  .sl-sp-about-status--latest {
+    color: var(--color-status-success);
+  }
+
+  .sl-sp-about-status--outdated {
+    color: var(--color-status-warning);
+  }
+
+  .sl-sp-about-update {
+    border: none;
+    border-radius: var(--radius-pill);
+    padding: 3px 12px;
+    cursor: pointer;
+    background: rgba(255, 195, 120, 0.16);
+    color: var(--color-status-warning);
+    box-shadow: inset 0 0 0 1px rgba(255, 195, 120, 0.35);
+    font-size: var(--text-caption-size) !important;
+    font-weight: var(--w-semibold);
+    transition:
+      background var(--dur-fast) var(--ease-standard),
+      box-shadow var(--dur-fast) var(--ease-standard),
+      transform 0.12s var(--ease-out);
+
+    &:hover {
+      background: rgba(255, 195, 120, 0.26);
+      box-shadow: inset 0 0 0 1px rgba(255, 195, 120, 0.55);
+    }
+
+    &:active {
+      transform: scale(0.96);
+    }
+  }
+
+  .sl-sp-about-build {
+    color: var(--color-text-tertiary);
+    font-size: var(--text-caption-size) !important;
+  }
+
+  .sl-sp-about-build-value {
+    color: var(--color-text-secondary);
+    font-weight: var(--w-medium);
+  }
+
+  .sl-sp-about-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  /* Neutral by default; a platform sets --brand and takes over the tint,
+     the hairline and the label colour. */
+  .sl-sp-about-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: var(--tap-min);
+    padding: 0 var(--space-4);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    background: var(--accent-tint-bg);
+    color: var(--color-text-primary);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+    font-size: var(--text-body-size) !important;
+    font-weight: var(--w-semibold);
+    transition:
+      background var(--dur-fast) var(--ease-standard),
+      box-shadow var(--dur-fast) var(--ease-standard),
+      transform 0.12s var(--ease-out);
+
+    &:hover {
+      background: var(--accent-tint-bg-hover);
+      box-shadow: inset 0 0 0 1px var(--hairline-strong);
+    }
+
+    &:active {
+      transform: scale(0.97);
+    }
+
+    &.sl-sp-about-link--brand {
+      background: rgba(var(--brand), 0.14);
+      box-shadow: inset 0 0 0 1px rgba(var(--brand), 0.35);
+      color: rgb(var(--brand));
+
+      &:hover {
+        background: rgba(var(--brand), 0.24);
+        box-shadow: inset 0 0 0 1px rgba(var(--brand), 0.55);
+      }
+    }
+  }
+
+  .sl-sp-about-arrow {
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+
+  /* Smaller windows: a narrower sidebar and pane gutters, same structure. */
+  @media (max-width: 900px) {
+    .sl-sp {
+      grid-template-columns: 184px minmax(0, 1fr);
+    }
+
+    .sl-sp-pane-header {
+      padding-left: 22px;
+    }
+
+    .sl-sp-pane-scroll {
+      padding-left: 22px;
+      padding-right: 22px;
+    }
+  }
+}
+
+/* ── Settings modal skin ─────────────────────────────────────────────────
+   The loader popup's look (builds/main/entrypoint.mjs: lavender ramp, cropped
+   brand mark, lavender ink) laid over the modal's glass, and kept thinner than
+   the popups so the client still shows through. Scoped to the settings modal;
+   other Spicy Lyrics modals keep the neutral plate.
+
+   Two layers, because of the entry animation in default.css:
+     - ::before stays the glass. Its colour, blur and shadow already transition,
+       and opacity must stay off it or the blur stops sampling the page.
+     - ::after carries the ramp and the mark. Gradients and images can't
+       transition, but ::after has no backdrop-filter, so it can simply fade. */
+sl-generic-modal.SpicyLyricsModal .sl-modal.slmodal-settingsPanel {
+  --sl-sp-field: oklch(0.3 0.095 297);
+  --sl-sp-field-deep: oklch(0.235 0.08 297);
+  --sl-sp-ink: oklch(0.87 0.08 297);
+  --sl-sp-ink-muted: oklch(0.775 0.058 297);
+  --sl-sp-cta: oklch(0.955 0.022 297);
+  --sl-sp-cta-ink: oklch(0.25 0.09 297);
+
+  /* Re-pointing the shared tokens tints every row, control and the footer. */
+  --color-text-primary: var(--sl-sp-ink);
+  --color-text-secondary: var(--sl-sp-ink-muted);
+  --color-text-tertiary: color-mix(in oklab, var(--sl-sp-ink) 50%, transparent);
+  --color-text-quaternary: color-mix(in oklab, var(--sl-sp-ink) 26%, transparent);
+  --hairline: color-mix(in oklab, var(--sl-sp-ink) 12%, transparent);
+  --hairline-strong: color-mix(in oklab, var(--sl-sp-ink) 20%, transparent);
+  --accent-tint-bg: color-mix(in oklab, var(--sl-sp-ink) 8%, transparent);
+  --accent-tint-bg-hover: color-mix(in oklab, var(--sl-sp-ink) 14%, transparent);
+  --accent: var(--sl-sp-cta);
+  --accent-hover: #fff;
+  --accent-on-fill: var(--sl-sp-cta-ink);
+}
+
+/* Same four shadows, in the same inset/outset order, as the closed state in
+   default.css, so opening and closing interpolate instead of snapping. */
+sl-generic-modal.SpicyLyricsModal .sl-modal.slmodal-settingsPanel::before {
+  background-color: color-mix(in oklab, var(--sl-sp-field-deep) 14%, transparent);
+  -webkit-backdrop-filter: blur(40px) saturate(1.6);
+  backdrop-filter: blur(40px) saturate(1.6);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--sl-sp-ink) 24%, transparent),
+    inset 0 0 0 1px color-mix(in oklab, var(--sl-sp-ink) 16%, transparent),
+    0 24px 64px -12px rgba(0, 0, 0, 0.45),
+    0 8px 16px -4px rgba(0, 0, 0, 0.28);
+}
+
+/* The mark's colour is --sl-sp-field's tint (oklch 0.435 0.105 297) in sRGB;
+   a data URI can't read custom properties. */
+sl-generic-modal.SpicyLyricsModal .sl-modal.slmodal-settingsPanel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: var(--radius-lg);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='rgb(88,67,131)' fill-opacity='0.4' transform='rotate(-14 12 12)'%3E%3Cpath d='M18.9962 5.00357C18.5208 4.52802 17.9233 4.19298 17.2696 4.03541C16.6159 3.87784 15.9313 3.90387 15.2915 4.11061C14.6516 4.31735 14.0813 4.69678 13.6433 5.20705C13.2054 5.71733 12.9169 6.33862 12.8097 7.00242L16.9973 11.1897C17.6611 11.0825 18.2824 10.794 18.7927 10.3561C19.303 9.91824 19.6825 9.34793 19.8893 8.7081C20.096 8.06827 20.122 7.38377 19.9645 6.73009C19.8069 6.07641 19.4718 5.47894 18.9962 5.00357ZM15.2227 12.153L11.845 8.77431C10.4947 10.3119 9.14443 11.8495 7.79421 13.3871L4.34436 17.3139C4.06732 17.6308 3.92106 18.0412 3.93518 18.4618C3.94929 18.8825 4.12273 19.2821 4.42039 19.5798C4.71804 19.8774 5.11767 20.0508 5.53838 20.0649C5.9591 20.0791 6.36945 19.9328 6.68639 19.6558L10.6328 16.1894L15.224 12.1543L15.2227 12.153ZM10.8636 6.96374C10.9806 5.9186 11.3904 4.92775 12.0457 4.10518C12.701 3.28261 13.5752 2.66176 14.5678 2.31407C15.5604 1.96638 16.631 1.90598 17.6564 2.13981C18.6818 2.37365 19.6203 2.89222 20.364 3.63586C21.1077 4.3795 21.6263 5.31798 21.8602 6.34331C22.094 7.36865 22.0336 8.43917 21.6859 9.43169C21.3382 10.4242 20.7173 11.2984 19.8947 11.9537C19.0721 12.6089 18.0811 13.0187 17.0359 13.1357L11.9108 17.6402L7.96445 21.1079C7.27835 21.7096 6.38902 22.0279 5.47687 21.9981C4.56473 21.9683 3.69808 21.5926 3.05275 20.9473C2.40742 20.302 2.03174 19.4354 2.00192 18.5234C1.97211 17.6113 2.29039 16.722 2.8922 16.0359L6.34334 12.1092L10.8636 6.96374Z'/%3E%3Cpath d='M8.35932 0.380176C8.40765 0.249583 8.59235 0.249583 8.64068 0.380176L9.15129 1.76009C9.16648 1.80114 9.19886 1.83352 9.23991 1.84871L10.6198 2.35932C10.7504 2.40765 10.7504 2.59235 10.6198 2.64068L9.23991 3.15129C9.19886 3.16648 9.16648 3.19886 9.15129 3.23991L8.64068 4.61982C8.59235 4.75042 8.40765 4.75042 8.35932 4.61982L7.84871 3.23991C7.83352 3.19886 7.80114 3.16648 7.76009 3.15129L6.38018 2.64068C6.24958 2.59235 6.24958 2.40765 6.38018 2.35932L7.76009 1.84871C7.80114 1.83352 7.83352 1.80114 7.84871 1.76009L8.35932 0.380176Z'/%3E%3Cpath d='M19.8593 14.3802C19.9076 14.2496 20.0924 14.2496 20.1407 14.3802L21.0564 16.855C21.0716 16.896 21.104 16.9284 21.145 16.9436L23.6198 17.8593C23.7504 17.9076 23.7504 18.0924 23.6198 18.1407L21.145 19.0564C21.104 19.0716 21.0716 19.104 21.0564 19.145L20.1407 21.6198C20.0924 21.7504 19.9076 21.7504 19.8593 21.6198L18.9436 19.145C18.9284 19.104 18.896 19.0716 18.855 19.0564L16.3802 18.1407C16.2496 18.0924 16.2496 17.9076 16.3802 17.8593L18.855 16.9436C18.896 16.9284 18.9284 16.896 18.9436 16.855L19.8593 14.3802Z'/%3E%3Cpath d='M13.3593 18.3802C13.4076 18.2496 13.5924 18.2496 13.6407 18.3802L14.1513 19.7601C14.1665 19.8011 14.1989 19.8335 14.2399 19.8487L15.6198 20.3593C15.7504 20.4076 15.7504 20.5924 15.6198 20.6407L14.2399 21.1513C14.1989 21.1665 14.1665 21.1989 14.1513 21.2399L13.6407 22.6198C13.5924 22.7504 13.4076 22.7504 13.3593 22.6198L12.8487 21.2399C12.8335 21.1989 12.8011 21.1665 12.7601 21.1513L11.3802 20.6407C11.2496 20.5924 11.2496 20.4076 11.3802 20.3593L12.7601 19.8487C12.8011 19.8335 12.8335 19.8011 12.8487 19.7601L13.3593 18.3802Z'/%3E%3Cpath d='M3.85932 3.38018C3.90765 3.24958 4.09235 3.24958 4.14068 3.38018L5.05643 5.85495C5.07162 5.89601 5.10399 5.92838 5.14505 5.94357L7.61982 6.85932C7.75042 6.90765 7.75042 7.09235 7.61982 7.14068L5.14505 8.05643C5.10399 8.07162 5.07162 8.10399 5.05643 8.14505L4.14068 10.6198C4.09235 10.7504 3.90765 10.7504 3.85932 10.6198L2.94357 8.14505C2.92838 8.10399 2.89601 8.07162 2.85495 8.05643L0.380176 7.14068C0.249583 7.09235 0.249583 6.90765 0.380176 6.85932L2.85495 5.94357C2.89601 5.92838 2.92838 5.89601 2.94357 5.85495L3.85932 3.38018Z'/%3E%3C/g%3E%3C/svg%3E"),
+    linear-gradient(
+      165deg,
+      color-mix(in oklab, var(--sl-sp-field) 26%, transparent) 0%,
+      color-mix(in oklab, var(--sl-sp-field-deep) 40%, transparent) 100%
+    );
+  background-repeat: no-repeat;
+  background-size: 420px auto, 100% 100%;
+  background-position: right -190px top -205px, 0 0;
+  pointer-events: none;
+  transition:
+    opacity 0.22s cubic-bezier(0.23, 1, 0.32, 1),
+    transform 0.22s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay-animated:not(.Active) .sl-modal.slmodal-settingsPanel::after {
+  opacity: 0;
+  transform: scale(0.96);
+}
+
+/* The popups' brand line, over the sidebar's title. */
+sl-generic-modal.SpicyLyricsModal .sl-modal.slmodal-settingsPanel .sl-sp-brand {
+  /* Icon colour is --sl-sp-ink-muted in sRGB. */
+  .sl-sp-brand-line {
+    display: block;
+    margin-bottom: 10px;
+    padding-left: 24px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='rgb(185,175,215)'%3E%3Cpath d='M18.9962 5.00357C18.5208 4.52802 17.9233 4.19298 17.2696 4.03541C16.6159 3.87784 15.9313 3.90387 15.2915 4.11061C14.6516 4.31735 14.0813 4.69678 13.6433 5.20705C13.2054 5.71733 12.9169 6.33862 12.8097 7.00242L16.9973 11.1897C17.6611 11.0825 18.2824 10.794 18.7927 10.3561C19.303 9.91824 19.6825 9.34793 19.8893 8.7081C20.096 8.06827 20.122 7.38377 19.9645 6.73009C19.8069 6.07641 19.4718 5.47894 18.9962 5.00357ZM15.2227 12.153L11.845 8.77431C10.4947 10.3119 9.14443 11.8495 7.79421 13.3871L4.34436 17.3139C4.06732 17.6308 3.92106 18.0412 3.93518 18.4618C3.94929 18.8825 4.12273 19.2821 4.42039 19.5798C4.71804 19.8774 5.11767 20.0508 5.53838 20.0649C5.9591 20.0791 6.36945 19.9328 6.68639 19.6558L10.6328 16.1894L15.224 12.1543L15.2227 12.153ZM10.8636 6.96374C10.9806 5.9186 11.3904 4.92775 12.0457 4.10518C12.701 3.28261 13.5752 2.66176 14.5678 2.31407C15.5604 1.96638 16.631 1.90598 17.6564 2.13981C18.6818 2.37365 19.6203 2.89222 20.364 3.63586C21.1077 4.3795 21.6263 5.31798 21.8602 6.34331C22.094 7.36865 22.0336 8.43917 21.6859 9.43169C21.3382 10.4242 20.7173 11.2984 19.8947 11.9537C19.0721 12.6089 18.0811 13.0187 17.0359 13.1357L11.9108 17.6402L7.96445 21.1079C7.27835 21.7096 6.38902 22.0279 5.47687 21.9981C4.56473 21.9683 3.69808 21.5926 3.05275 20.9473C2.40742 20.302 2.03174 19.4354 2.00192 18.5234C1.97211 17.6113 2.29039 16.722 2.8922 16.0359L6.34334 12.1092L10.8636 6.96374Z'/%3E%3Cpath d='M8.35932 0.380176C8.40765 0.249583 8.59235 0.249583 8.64068 0.380176L9.15129 1.76009C9.16648 1.80114 9.19886 1.83352 9.23991 1.84871L10.6198 2.35932C10.7504 2.40765 10.7504 2.59235 10.6198 2.64068L9.23991 3.15129C9.19886 3.16648 9.16648 3.19886 9.15129 3.23991L8.64068 4.61982C8.59235 4.75042 8.40765 4.75042 8.35932 4.61982L7.84871 3.23991C7.83352 3.19886 7.80114 3.16648 7.76009 3.15129L6.38018 2.64068C6.24958 2.59235 6.24958 2.40765 6.38018 2.35932L7.76009 1.84871C7.80114 1.83352 7.83352 1.80114 7.84871 1.76009L8.35932 0.380176Z'/%3E%3Cpath d='M19.8593 14.3802C19.9076 14.2496 20.0924 14.2496 20.1407 14.3802L21.0564 16.855C21.0716 16.896 21.104 16.9284 21.145 16.9436L23.6198 17.8593C23.7504 17.9076 23.7504 18.0924 23.6198 18.1407L21.145 19.0564C21.104 19.0716 21.0716 19.104 21.0564 19.145L20.1407 21.6198C20.0924 21.7504 19.9076 21.7504 19.8593 21.6198L18.9436 19.145C18.9284 19.104 18.896 19.0716 18.855 19.0564L16.3802 18.1407C16.2496 18.0924 16.2496 17.9076 16.3802 17.8593L18.855 16.9436C18.896 16.9284 18.9284 16.896 18.9436 16.855L19.8593 14.3802Z'/%3E%3Cpath d='M13.3593 18.3802C13.4076 18.2496 13.5924 18.2496 13.6407 18.3802L14.1513 19.7601C14.1665 19.8011 14.1989 19.8335 14.2399 19.8487L15.6198 20.3593C15.7504 20.4076 15.7504 20.5924 15.6198 20.6407L14.2399 21.1513C14.1989 21.1665 14.1665 21.1989 14.1513 21.2399L13.6407 22.6198C13.5924 22.7504 13.4076 22.7504 13.3593 22.6198L12.8487 21.2399C12.8335 21.1989 12.8011 21.1665 12.7601 21.1513L11.3802 20.6407C11.2496 20.5924 11.2496 20.4076 11.3802 20.3593L12.7601 19.8487C12.8011 19.8335 12.8335 19.8011 12.8487 19.7601L13.3593 18.3802Z'/%3E%3Cpath d='M3.85932 3.38018C3.90765 3.24958 4.09235 3.24958 4.14068 3.38018L5.05643 5.85495C5.07162 5.89601 5.10399 5.92838 5.14505 5.94357L7.61982 6.85932C7.75042 6.90765 7.75042 7.09235 7.61982 7.14068L5.14505 8.05643C5.10399 8.07162 5.07162 8.10399 5.05643 8.14505L4.14068 10.6198C4.09235 10.7504 3.90765 10.7504 3.85932 10.6198L2.94357 8.14505C2.92838 8.10399 2.89601 8.07162 2.85495 8.05643L0.380176 7.14068C0.249583 7.09235 0.249583 6.90765 0.380176 6.85932L2.85495 5.94357C2.89601 5.92838 2.92838 5.89601 2.94357 5.85495L3.85932 3.38018Z'/%3E%3C/g%3E%3C/svg%3E") no-repeat left center / 16px 16px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 16px;
+    letter-spacing: normal;
+    color: var(--sl-sp-ink-muted);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  sl-generic-modal.SpicyLyricsModal .sl-modal.slmodal-settingsPanel::after {
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='rgb(88,67,131)' fill-opacity='0.55' transform='rotate(-14 12 12)'%3E%3Cpath d='M18.9962 5.00357C18.5208 4.52802 17.9233 4.19298 17.2696 4.03541C16.6159 3.87784 15.9313 3.90387 15.2915 4.11061C14.6516 4.31735 14.0813 4.69678 13.6433 5.20705C13.2054 5.71733 12.9169 6.33862 12.8097 7.00242L16.9973 11.1897C17.6611 11.0825 18.2824 10.794 18.7927 10.3561C19.303 9.91824 19.6825 9.34793 19.8893 8.7081C20.096 8.06827 20.122 7.38377 19.9645 6.73009C19.8069 6.07641 19.4718 5.47894 18.9962 5.00357ZM15.2227 12.153L11.845 8.77431C10.4947 10.3119 9.14443 11.8495 7.79421 13.3871L4.34436 17.3139C4.06732 17.6308 3.92106 18.0412 3.93518 18.4618C3.94929 18.8825 4.12273 19.2821 4.42039 19.5798C4.71804 19.8774 5.11767 20.0508 5.53838 20.0649C5.9591 20.0791 6.36945 19.9328 6.68639 19.6558L10.6328 16.1894L15.224 12.1543L15.2227 12.153ZM10.8636 6.96374C10.9806 5.9186 11.3904 4.92775 12.0457 4.10518C12.701 3.28261 13.5752 2.66176 14.5678 2.31407C15.5604 1.96638 16.631 1.90598 17.6564 2.13981C18.6818 2.37365 19.6203 2.89222 20.364 3.63586C21.1077 4.3795 21.6263 5.31798 21.8602 6.34331C22.094 7.36865 22.0336 8.43917 21.6859 9.43169C21.3382 10.4242 20.7173 11.2984 19.8947 11.9537C19.0721 12.6089 18.0811 13.0187 17.0359 13.1357L11.9108 17.6402L7.96445 21.1079C7.27835 21.7096 6.38902 22.0279 5.47687 21.9981C4.56473 21.9683 3.69808 21.5926 3.05275 20.9473C2.40742 20.302 2.03174 19.4354 2.00192 18.5234C1.97211 17.6113 2.29039 16.722 2.8922 16.0359L6.34334 12.1092L10.8636 6.96374Z'/%3E%3Cpath d='M8.35932 0.380176C8.40765 0.249583 8.59235 0.249583 8.64068 0.380176L9.15129 1.76009C9.16648 1.80114 9.19886 1.83352 9.23991 1.84871L10.6198 2.35932C10.7504 2.40765 10.7504 2.59235 10.6198 2.64068L9.23991 3.15129C9.19886 3.16648 9.16648 3.19886 9.15129 3.23991L8.64068 4.61982C8.59235 4.75042 8.40765 4.75042 8.35932 4.61982L7.84871 3.23991C7.83352 3.19886 7.80114 3.16648 7.76009 3.15129L6.38018 2.64068C6.24958 2.59235 6.24958 2.40765 6.38018 2.35932L7.76009 1.84871C7.80114 1.83352 7.83352 1.80114 7.84871 1.76009L8.35932 0.380176Z'/%3E%3Cpath d='M19.8593 14.3802C19.9076 14.2496 20.0924 14.2496 20.1407 14.3802L21.0564 16.855C21.0716 16.896 21.104 16.9284 21.145 16.9436L23.6198 17.8593C23.7504 17.9076 23.7504 18.0924 23.6198 18.1407L21.145 19.0564C21.104 19.0716 21.0716 19.104 21.0564 19.145L20.1407 21.6198C20.0924 21.7504 19.9076 21.7504 19.8593 21.6198L18.9436 19.145C18.9284 19.104 18.896 19.0716 18.855 19.0564L16.3802 18.1407C16.2496 18.0924 16.2496 17.9076 16.3802 17.8593L18.855 16.9436C18.896 16.9284 18.9284 16.896 18.9436 16.855L19.8593 14.3802Z'/%3E%3Cpath d='M13.3593 18.3802C13.4076 18.2496 13.5924 18.2496 13.6407 18.3802L14.1513 19.7601C14.1665 19.8011 14.1989 19.8335 14.2399 19.8487L15.6198 20.3593C15.7504 20.4076 15.7504 20.5924 15.6198 20.6407L14.2399 21.1513C14.1989 21.1665 14.1665 21.1989 14.1513 21.2399L13.6407 22.6198C13.5924 22.7504 13.4076 22.7504 13.3593 22.6198L12.8487 21.2399C12.8335 21.1989 12.8011 21.1665 12.7601 21.1513L11.3802 20.6407C11.2496 20.5924 11.2496 20.4076 11.3802 20.3593L12.7601 19.8487C12.8011 19.8335 12.8335 19.8011 12.8487 19.7601L13.3593 18.3802Z'/%3E%3Cpath d='M3.85932 3.38018C3.90765 3.24958 4.09235 3.24958 4.14068 3.38018L5.05643 5.85495C5.07162 5.89601 5.10399 5.92838 5.14505 5.94357L7.61982 6.85932C7.75042 6.90765 7.75042 7.09235 7.61982 7.14068L5.14505 8.05643C5.10399 8.07162 5.07162 8.10399 5.05643 8.14505L4.14068 10.6198C4.09235 10.7504 3.90765 10.7504 3.85932 10.6198L2.94357 8.14505C2.92838 8.10399 2.89601 8.07162 2.85495 8.05643L0.380176 7.14068C0.249583 7.09235 0.249583 6.90765 0.380176 6.85932L2.85495 5.94357C2.89601 5.92838 2.92838 5.89601 2.94357 5.85495L3.85932 3.38018Z'/%3E%3C/g%3E%3C/svg%3E"),
+      linear-gradient(165deg, var(--sl-sp-field) 0%, var(--sl-sp-field-deep) 100%);
+  }
+}
+
+/* ── Peek ────────────────────────────────────────────────────────────────
+   Steps the panel aside so the lyrics behind it show while a setting is being
+   tried (index.tsx sets data-peek on the overlay). "all": hold-to-peek, only the
+   button stays. "row": a slider is being dragged, only its row stays, on a plate
+   of its own. The glass keeps its own transitions (default.css), so the blur
+   eases out rather than dropping; nothing above it changes opacity. */
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay.sl-modal-overlay-animated.Active[data-peek] {
+  background-color: rgba(0, 0, 0, 0);
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay.Active[data-peek] .sl-modal.slmodal-settingsPanel::before {
+  background-color: transparent;
+  /* none, not blur(0px) saturate(1): it looks the same, but drops the backdrop pass that would
+     otherwise run on every frame of the lyrics moving behind. */
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow:
+    inset 0 1px 0 transparent,
+    inset 0 0 0 1px transparent,
+    0 0 0 0 transparent,
+    0 0 0 0 transparent;
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay[data-peek] .sl-modal.slmodal-settingsPanel::after {
+  opacity: 0;
+}
+
+sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
+  .sl-sp-peek {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    margin-left: auto;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--accent-tint-bg);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    touch-action: none;
+    transition:
+      background-color var(--dur-fast) ease,
+      color var(--dur-fast) ease,
+      transform 0.12s var(--ease-out);
+
+    &:hover,
+    &[aria-pressed="true"] {
+      background: var(--accent-tint-bg-hover);
+      color: var(--color-text-primary);
+    }
+
+    &:active {
+      transform: scale(0.94);
+    }
+
+    & + .sl-sp-close {
+      margin-left: 0;
+    }
+  }
+
+  /* None of these has a transition of its own to clobber; .sl-sp-close adds
+     opacity to its list instead. */
+  .sl-sp-sidebar,
+  .sl-sp-pane-title,
+  .sl-sp-pane-count,
+  .sl-sp-pane-scroll,
+  .sl-sp-intro,
+  .sl-sp-group-title,
+  .sl-sp-row,
+  .sl-sp-empty {
+    transition: opacity 0.18s var(--ease-out, ease);
+  }
+
+  &[data-peek="all"] :is(.sl-sp-sidebar, .sl-sp-pane-header > :not(.sl-sp-peek), .sl-sp-pane-scroll) {
+    opacity: 0;
+  }
+
+  &[data-peek="row"] {
+    :is(.sl-sp-sidebar, .sl-sp-pane-header, .sl-sp-intro, .sl-sp-group-title, .sl-sp-empty) {
+      opacity: 0;
+    }
+
+    .sl-sp-row:not([data-peek-keep]) {
+      opacity: 0;
+    }
+
+    /* The card's tint would outline the rows that left. */
+    .sl-sp-card {
+      background: transparent;
+      box-shadow: none;
+    }
+
+    /* Solid rather than blurred: the pane is transformed, so a backdrop blur here
+       would have nothing to sample. */
+    .sl-sp-row[data-peek-keep] {
+      border-radius: var(--radius-md);
+      background: color-mix(in oklab, var(--sl-sp-field-deep, #141414) 88%, transparent);
+      box-shadow:
+        inset 0 0 0 1px var(--hairline),
+        0 12px 32px -8px rgba(0, 0, 0, 0.5);
+
+      &::before {
+        display: none;
+      }
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  sl-generic-modal.SpicyLyricsModal .sl-modal-overlay .sl-sp-peek:active {
+    transform: none;
+  }
+}
+
+/* Opacity only: the pane changed, nothing travelled. */
+@keyframes sl-sp-pane-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes sl-sp-sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* A still ring would read as stuck; a slow breath says "working" without
+     the spin. */
+  @keyframes sl-sp-sync-spin {
+    50% {
+      opacity: 0.35;
+    }
+  }
+
+  sl-generic-modal.SpicyLyricsModal .sl-modal-overlay .sl-sp-sync-status {
+    transform: none;
+  }
+
+  sl-generic-modal.SpicyLyricsModal .sl-modal-overlay .sl-sp-sync-spinner {
+    border-top-color: currentColor;
+    animation-duration: 1.4s;
+    animation-timing-function: ease-in-out;
+  }
+
+  /* Presses keep their colour change and drop the scale. */
+  sl-generic-modal.SpicyLyricsModal .sl-modal-overlay :is(.sl-sp-tab, .sl-sp-close):active {
+    transform: none;
+  }
+}
