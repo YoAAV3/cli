@@ -369,6 +369,15 @@
 		enableLyricsButton();
 		setInterval(enableLyricsButton, 1000);
 	} catch (e) {}
+
+	// 2b. Lyrics live in Spotify's lyrics button only — hide the custom
+	// app's own library/nav entry (the route stays alive for routing).
+	try {
+		var entryStyle = document.createElement("style");
+		entryStyle.id = "lyricly-hide-entry";
+		entryStyle.textContent = 'a[href*="lyricly" i]{display:none!important}';
+		document.head.appendChild(entryStyle);
+	} catch (e) {}
 	try {
 		document.addEventListener("click", function (e) {
 			try {

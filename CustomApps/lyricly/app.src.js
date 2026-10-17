@@ -110,8 +110,18 @@ function LyriclyApp() {
 				setUi((s) => ({ ...s, phase: "static", staticLines: ["♪ Instrumental ♪"], source: pack.provider }));
 				return true;
 			}
-			const amLines = toAMLLLines(pack.lines);
-			const timed = amLines.filter((l) => l.endTime > l.startTime);
+		const amLines = toAMLLLines(pack.lines);
+		const timed = amLines.filter((l) => l.endTime > l.startTime);
+		// Live diagnostics handle (read via CDP / console): what the app
+		// actually fed the renderer + the raw pack shape.
+		try {
+			window.__lyriclyDebug = {
+				pack: { provider: pack.provider, syncType: pack.syncType, wordTiming: pack.wordTiming, lines: pack.lines.length },
+				amllLines: amLines.length,
+				timed,
+				player: am.player,
+			};
+		} catch (e) {}
 			if (!timed.length) {
 				// Unsynced: clear the player, show the plain static block.
 				try { am.player.setLyricLines([], 0); } catch (e) {}
@@ -183,6 +193,15 @@ function LyriclyApp() {
 				host.appendChild(background.getElement());
 				host.appendChild(player.getElement());
 			}
+			// AMLL measures its viewport at construction (pre-mount = 0x0)
+			// and renders nothing in a zero viewport. Re-measure now that
+			// the element is in the DOM, and again after layout settles
+			// (fonts, first paint) + on window resizes.
+			try { player.onResize(); } catch (e) {}
+			setTimeout(() => { try { player.onResize(); } catch (e) {} }, 400);
+			setTimeout(() => { try { player.onResize(); } catch (e) {} }, 1500);
+			const onWinResize = () => { try { player.onResize(); } catch (e) {} };
+			try { window.addEventListener("resize", onWinResize); } catch (e) {}
 		} catch (e) {
 			setUi((s) => ({ ...s, phase: "none" }));
 			return undefined;
@@ -384,6 +403,7 @@ function LyriclyApp() {
 			try { Spicetify.Player.removeEventListener("onplaypause", onPlayPause); } catch (e) {}
 			try { document.removeEventListener("visibilitychange", onVisibilityChange); } catch (e) {}
 			try { window.removeEventListener("resize", onResize); } catch (e) {}
+			try { window.removeEventListener("resize", onWinResize); } catch (e) {}
 			try { window.removeEventListener("keydown", onKey, true); } catch (e) {}
 		 try {
 				const am2 = amRef.current;
