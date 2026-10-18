@@ -1,5 +1,6 @@
 export const LYRICA_BASE_URL = "https://test-0k.onrender.com";
 export const LYRICA_SOURCE_SEQUENCE = "8,7,2,1,3,4,5,6";
+export const LYRICA_REQUEST_TIMEOUT_MS = 120_000;
 
 type LyricaWord = {
   text?: string;

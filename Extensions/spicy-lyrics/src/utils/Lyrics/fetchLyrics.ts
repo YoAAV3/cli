@@ -7,7 +7,7 @@ import Logger from "../Logger.ts";
 import { getRemoteConfig } from "../remoteConfig.ts";
 import { $currentLyricsData, $currentLyricsType, $currentlyFetching } from "../stores.ts";
 import { IsEmptyLyrics } from "./EmptyLines.ts";
-import { FetchLyricaLyrics } from "./Lyrica.ts";
+import { FetchLyricaLyrics, LYRICA_REQUEST_TIMEOUT_MS } from "./Lyrica.ts";
 import { SetShownNotice, SyncNoLyricsLayout } from "./LyricsNotice.ts";
 import { LyricsQueueRetry } from "./LyricsQueueRetry.ts";
 import { HideLyricsSkeleton, IsLyricsSkeletonEnabled, ShowLyricsSkeleton } from "./LyricsSkeleton.ts";
@@ -321,6 +321,7 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
     return null;
   }
 
+  let requestTimedOut = false;
   try {
     const title = SpotifyPlayer.GetName() ?? "";
     const artist =
@@ -329,7 +330,10 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
         .filter(Boolean)
         .join(", ") ?? "";
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30_000);
+    const timeout = setTimeout(() => {
+      requestTimedOut = true;
+      controller.abort();
+    }, LYRICA_REQUEST_TIMEOUT_MS);
     let lyricsQuery;
     try {
       lyricsQuery = await FetchLyricaLyrics(title, artist, controller.signal);
@@ -398,8 +402,12 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
   } catch (error) {
     $currentlyFetching.set(false);
     hideLoaderFor(uri);
-    noteFailure(uri, "Lyrica", error);
-    if (error instanceof TypeError || (typeof DOMException !== "undefined" && error instanceof DOMException && error.name === "AbortError")) {
+    noteFailure(uri, "Lyrica", requestTimedOut ? `Request timed out after ${LYRICA_REQUEST_TIMEOUT_MS / 1000} seconds` : error);
+    if (
+      requestTimedOut ||
+      error instanceof TypeError ||
+      (typeof DOMException !== "undefined" && error instanceof DOMException && error.name === "AbortError")
+    ) {
       lyricsLogger.warn("Lyrica request did not return a readable response", error);
       return ["service-unavailable", 0];
     }

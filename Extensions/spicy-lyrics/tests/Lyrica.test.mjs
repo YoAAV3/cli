@@ -1,10 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 
-import {
-  FetchLyricaLyrics,
-  LYRICA_SOURCE_SEQUENCE,
-  normalizeLyricaResponse,
-} from "../src/utils/Lyrics/Lyrica.ts";
+import { FetchLyricaLyrics, LYRICA_REQUEST_TIMEOUT_MS, LYRICA_SOURCE_SEQUENCE, normalizeLyricaResponse } from "../src/utils/Lyrics/Lyrica.ts";
 
 test("normalizes timestamped Lyrica lines for Spicy Lyrics", () => {
   const lyrics = normalizeLyricaResponse({
@@ -103,4 +99,8 @@ test("queries Lyrica with only the configured provider sequence", async () => {
   expect(url.searchParams.get("pass")).toBe("true");
   expect(url.searchParams.get("song")).toBe("Song");
   expect(result.lyrics?.provider).toBe("lyrica");
+});
+
+test("allows time for Lyrica's ordered provider fallbacks", () => {
+  expect(LYRICA_REQUEST_TIMEOUT_MS).toBe(120_000);
 });
