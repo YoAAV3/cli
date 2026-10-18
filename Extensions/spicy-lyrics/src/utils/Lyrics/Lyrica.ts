@@ -1,6 +1,7 @@
 export const LYRICA_BASE_URL = "https://test-0k.onrender.com";
 export const LYRICA_SOURCE_SEQUENCE = "8,7,2,1,3,4,5,6";
 export const LYRICA_REQUEST_TIMEOUT_MS = 120_000;
+const MILLISECONDS_PER_SECOND = 1000;
 
 type LyricaWord = {
   text?: string;
@@ -79,14 +80,14 @@ export function normalizeLyricaResponse(payload: LyricaPayload): SpicyLyrics | n
   const validLines = timedLines
     .map((line) => ({
       text: String(line.text ?? "").trim(),
-      start: Number(line.start_time),
-      end: Number(line.end_time),
+      start: Number(line.start_time) / MILLISECONDS_PER_SECOND,
+      end: Number(line.end_time) / MILLISECONDS_PER_SECOND,
       words: Array.isArray(line.words)
         ? line.words
             .map((word) => ({
               text: String(word.text ?? "").trim(),
-              start: Number(word.start),
-              end: Number(word.end),
+              start: Number(word.start) / MILLISECONDS_PER_SECOND,
+              end: Number(word.end) / MILLISECONDS_PER_SECOND,
             }))
             .filter((word) => word.text && Number.isFinite(word.start) && Number.isFinite(word.end) && word.start >= 0 && word.end > word.start)
         : [],
@@ -102,7 +103,7 @@ export function normalizeLyricaResponse(payload: LyricaPayload): SpicyLyrics | n
           ? line.end
           : Number.isFinite(nextStart) && nextStart > line.start
             ? nextStart
-            : line.start + 4000,
+            : line.start + 4,
     };
   });
 

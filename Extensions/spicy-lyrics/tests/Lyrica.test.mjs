@@ -17,6 +17,7 @@ test("normalizes timestamped Lyrica lines for Spicy Lyrics", () => {
   expect(lyrics?.Type).toBe("Line");
   expect(lyrics?.provider).toBe("lyrica");
   expect(lyrics?.source).toBe("apple-music");
+  expect(lyrics?.Content?.map((line) => ("StartTime" in line ? line.StartTime : 0))).toEqual([1, 2]);
   expect(lyrics?.Content?.map((line) => ("Text" in line ? line.Text : ""))).toEqual(["First line", "Second line"]);
 });
 
@@ -31,7 +32,7 @@ test("fills missing line end times from the next line or a short fallback", () =
     },
   });
 
-  expect(lyrics?.Content?.map((line) => ("EndTime" in line ? line.EndTime : 0))).toEqual([3000, 7000]);
+  expect(lyrics?.Content?.map((line) => ("EndTime" in line ? line.EndTime : 0))).toEqual([3, 7]);
 });
 
 test("uses word timings when Lyrica identifies word synchronization", () => {
@@ -54,9 +55,13 @@ test("uses word timings when Lyrica identifies word synchronization", () => {
   });
 
   expect(lyrics?.Type).toBe("Syllable");
-  expect(lyrics?.Content?.[0] && "Lead" in lyrics.Content[0] ? lyrics.Content[0].Lead.Syllables.map((word) => word.Text) : []).toEqual([
-    "Hello",
-    "world",
+  expect(
+    lyrics?.Content?.[0] && "Lead" in lyrics.Content[0]
+      ? lyrics.Content[0].Lead.Syllables.map((word) => [word.Text, word.StartTime, word.EndTime])
+      : [],
+  ).toEqual([
+    ["Hello", 0, 0.9],
+    ["world", 1, 2],
   ]);
 });
 
@@ -103,4 +108,22 @@ test("queries Lyrica with only the configured provider sequence", async () => {
 
 test("allows time for Lyrica's ordered provider fallbacks", () => {
   expect(LYRICA_REQUEST_TIMEOUT_MS).toBe(120_000);
+});
+
+test("converts the reported song's Lyrica millisecond timestamps to seconds", () => {
+  const lyrics = normalizeLyricaResponse({
+    status: "success",
+    data: {
+      timed_lyrics: [
+        {
+          text: "そばに来て 崩れゆく抑制",
+          start_time: 1360,
+          end_time: 9210,
+        },
+      ],
+    },
+  });
+
+  expect(lyrics?.Content?.[0] && "StartTime" in lyrics.Content[0] ? lyrics.Content[0].StartTime : null).toBe(1.36);
+  expect(lyrics?.Content?.[0] && "EndTime" in lyrics.Content[0] ? lyrics.Content[0].EndTime : null).toBe(9.21);
 });
